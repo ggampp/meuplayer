@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>MeuPlayer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="logo">MeuPlayer</div>
+      <nav class="nav">
+        <button class="nav__item" data-scroll="hero">Início</button>
+        <button class="nav__item" data-scroll="rows">Explorar</button>
+        <button class="nav__item" data-scroll="about">Sobre</button>
+      </nav>
+      <div class="search">
+        <input
+          id="searchInput"
+          type="search"
+          placeholder="Buscar por ID (TMDB/IMDb)"
+          autocomplete="off"
+        />
+      </div>
+    </header>
+
+    <main>
+      <section id="hero" class="hero">
+        <div class="hero__content">
+          <p class="hero__eyebrow">Streaming rápido</p>
+          <h1>Assista agora sem complicação</h1>
+          <p class="hero__subtitle">
+            Explore filmes, séries e animes usando a API SuperFlix.
+          </p>
+          <div class="hero__actions">
+            <button id="heroPlay" class="btn btn--primary" disabled>
+              Reproduzir
+            </button>
+            <button id="heroInfo" class="btn btn--ghost" disabled>
+              Ver detalhes
+            </button>
+          </div>
+          <p id="heroMeta" class="hero__meta">Carregando catálogo...</p>
+        </div>
+        <div class="hero__backdrop" aria-hidden="true"></div>
+      </section>
+
+      <section id="rows" class="rows">
+        <div class="rows__header">
+          <h2>Catálogo</h2>
+          <span id="rowsStatus" class="rows__status">Carregando...</span>
+        </div>
+        <div id="rowsContainer" class="rows__container"></div>
+      </section>
+
+      <section id="about" class="about">
+        <h2>Como funciona</h2>
+        <p>
+          Este frontend consome a API SuperFlix para listar IDs e embutir
+          o player oficial via iframe. Selecione um item e reproduza.
+        </p>
+      </section>
+    </main>
+
+    <div id="playerModal" class="modal" aria-hidden="true">
+      <div class="modal__overlay" data-close></div>
+      <div class="modal__content">
+        <div class="modal__header">
+          <div>
+            <h3 id="modalTitle">Player</h3>
+            <p id="modalMeta" class="modal__meta"></p>
+          </div>
+          <button class="modal__close" data-close>&times;</button>
+        </div>
+        <div class="modal__controls">
+          <div class="control">
+            <label for="modalType">Tipo</label>
+            <select id="modalType">
+              <option value="movie">Filme</option>
+              <option value="serie">Série/Anime</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="modalId">ID</label>
+            <input id="modalId" type="text" />
+          </div>
+          <div class="control">
+            <label for="modalSeason">Temporada</label>
+            <input id="modalSeason" type="number" min="1" value="1" />
+          </div>
+          <div class="control">
+            <label for="modalEpisode">Episódio</label>
+            <input id="modalEpisode" type="number" min="1" value="1" />
+          </div>
+          <button id="modalUpdate" class="btn btn--primary">
+            Atualizar
+          </button>
+        </div>
+        <div class="modal__player">
+          <iframe
+            id="playerFrame"
+            title="SuperFlix Player"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
