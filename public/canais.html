@@ -1,0 +1,69 @@
+<section id="canais-ao-vivo">
+  <h2>Canais ao vivo</h2>
+
+  <style>
+    #canais-ao-vivo .canais-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    #canais-ao-vivo .canal-card {
+      display: block;
+      padding: 12px 14px;
+      border: 1px solid #d0d0d0;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #111;
+      background: #f8f8f8;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+
+    #canais-ao-vivo .canal-card:hover,
+    #canais-ao-vivo .canal-card:focus {
+      border-color: #9a9a9a;
+      background: #eeeeee;
+    }
+  </style>
+
+  <div class="canais-grid">
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=discovery">Discovery</a>
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=sportv1">SporTV 1</a>
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=sportv2">SporTV 2</a>
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=sportv3">SporTV 3</a>
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=premiereclubes">Premiere Clubes</a>
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=premiere3">Premiere 3</a>
+    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=bobojr">Bobo Jr</a>
+  </div>
+
+  <iframe
+    id="player"
+    name="Player"
+    src="https://redecanaistv.fm/player3/ch.php?canal=discovery"
+    frameborder="0"
+    height="400"
+    scrolling="no"
+    width="640"
+    allow="encrypted-media"
+    allowFullScreen
+  ></iframe>
+
+  <script>
+    (function () {
+      const cards = document.querySelectorAll("#canais-ao-vivo .canal-card");
+      const player = document.getElementById("player");
+
+      cards.forEach((card) => {
+        card.addEventListener("click", (event) => {
+          event.preventDefault();
+          const src = card.getAttribute("data-src");
+          if (src && player) {
+            player.setAttribute("src", src);
+          }
+        });
+      });
+    })();
+  </script>
+</section>

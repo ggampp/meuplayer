@@ -824,6 +824,9 @@ function App() {
               >
                 Ver detalhes
               </button>
+              <a className="btn btn--ghost" href="canais.html">
+                Canais ao vivo
+              </a>
             </div>
             <p className="hero__meta">
               {featured.id
