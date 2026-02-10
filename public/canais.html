@@ -1,69 +1,107 @@
-<section id="canais-ao-vivo">
-  <h2>Canais ao vivo</h2>
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer - Canais</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .channels-page {
+        padding: 32px 48px;
+        display: grid;
+        gap: 18px;
+      }
 
-  <style>
-    #canais-ao-vivo .canais-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
+      .channels-page h1 {
+        font-size: 1.6rem;
+      }
 
-    #canais-ao-vivo .canal-card {
-      display: block;
-      padding: 12px 14px;
-      border: 1px solid #d0d0d0;
-      border-radius: 8px;
-      text-decoration: none;
-      color: #111;
-      background: #f8f8f8;
-      text-align: center;
-      font-family: Arial, sans-serif;
-    }
+      .channels-page .channels-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+      }
 
-    #canais-ao-vivo .canal-card:hover,
-    #canais-ao-vivo .canal-card:focus {
-      border-color: #9a9a9a;
-      background: #eeeeee;
-    }
-  </style>
+      .channels-page .channel-card {
+        border: 1px solid var(--outline);
+        border-radius: 12px;
+        background: var(--bg-card);
+        color: var(--text);
+        padding: 14px 12px;
+        text-align: center;
+        cursor: pointer;
+      }
 
-  <div class="canais-grid">
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=discovery">Discovery</a>
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=sportv1">SporTV 1</a>
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=sportv2">SporTV 2</a>
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=sportv3">SporTV 3</a>
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=premiereclubes">Premiere Clubes</a>
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=premiere3">Premiere 3</a>
-    <a class="canal-card" href="#player" data-src="https://redecanaistv.fm/player3/ch.php?canal=bobojr">Bobo Jr</a>
-  </div>
+      .channels-page .channel-card:hover {
+        border-color: rgba(229, 9, 20, 0.45);
+      }
 
-  <iframe
-    id="player"
-    name="Player"
-    src="https://redecanaistv.fm/player3/ch.php?canal=discovery"
-    frameborder="0"
-    height="400"
-    scrolling="no"
-    width="640"
-    allow="encrypted-media"
-    allowFullScreen
-  ></iframe>
+      .channels-page .status {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
 
-  <script>
-    (function () {
-      const cards = document.querySelectorAll("#canais-ao-vivo .canal-card");
-      const player = document.getElementById("player");
+      .channels-page iframe {
+        border: 0;
+        width: 100%;
+        max-width: 980px;
+        min-height: 560px;
+        background: #000;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="channels-page" id="canais-ao-vivo">
+      <h1>Canais ao vivo</h1>
+      <p class="status" id="channelsStatus">Carregando canais...</p>
+      <div class="channels-grid" id="channelsGrid"></div>
+      <iframe id="player" title="Player de canais" allowfullscreen></iframe>
+    </main>
 
-      cards.forEach((card) => {
-        card.addEventListener("click", (event) => {
-          event.preventDefault();
-          const src = card.getAttribute("data-src");
-          if (src && player) {
-            player.setAttribute("src", src);
-          }
-        });
-      });
-    })();
-  </script>
-</section>
+    <script>
+      (function () {
+        const grid = document.getElementById("channelsGrid");
+        const player = document.getElementById("player");
+        const status = document.getElementById("channelsStatus");
+
+        function renderChannels(channels) {
+          grid.innerHTML = "";
+          channels.forEach((channel, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "channel-card";
+            button.textContent = channel.nome || channel.id || "Canal";
+            button.addEventListener("click", () => {
+              player.src = channel.src || "";
+              status.textContent = `Canal atual: ${button.textContent}`;
+            });
+            grid.appendChild(button);
+
+            if (index === 0 && channel.src) {
+              player.src = channel.src;
+              status.textContent = `Canal atual: ${button.textContent}`;
+            }
+          });
+        }
+
+        fetch("/canais.json")
+          .then((response) => {
+            if (!response.ok) throw new Error("Falha ao carregar canais");
+            return response.json();
+          })
+          .then((channels) => {
+            if (!Array.isArray(channels) || channels.length === 0) {
+              status.textContent = "Nenhum canal configurado.";
+              return;
+            }
+            renderChannels(channels);
+          })
+          .catch((error) => {
+            status.textContent = "Erro ao carregar canais.";
+            console.error(error);
+          });
+      })();
+    </script>
+  </body>
+</html>

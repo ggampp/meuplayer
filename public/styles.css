@@ -109,6 +109,46 @@ select {
   margin-bottom: 24px;
 }
 
+.hero__latest {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 10px;
+  border: 1px solid var(--outline);
+  border-radius: 14px;
+  background: rgba(10, 10, 18, 0.5);
+}
+
+.hero__latest-image {
+  width: 96px;
+  height: 136px;
+  border-radius: 10px;
+  background: #12121f center / cover no-repeat;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--outline);
+}
+
+.hero__latest-info {
+  display: grid;
+  gap: 8px;
+}
+
+.hero__latest-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.hero__latest-info h3 {
+  font-size: 1.05rem;
+}
+
+.hero__latest-info .btn {
+  width: fit-content;
+}
+
 .hero__actions {
   display: flex;
   gap: 12px;
@@ -137,8 +177,13 @@ select {
   opacity: 0.9;
 }
 
+.catalog-header {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), var(--bg) 72%);
+  padding-top: 16px;
+}
+
 .filters {
-  padding: 0 48px 24px;
+  padding: 12px 48px 28px;
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -594,11 +639,24 @@ select {
     padding: 64px 20px 32px;
   }
 
+  .hero__latest {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+
+  .hero__latest-image {
+    width: 80px;
+    height: 112px;
+  }
+
   .filters,
   .rows,
   .calendar,
   .about {
     padding: 24px 20px 48px;
+  }
+
+  .catalog-header .filters {
+    padding: 16px 20px 28px;
   }
 
   .row__grid {

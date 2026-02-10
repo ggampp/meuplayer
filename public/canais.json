@@ -1,0 +1,37 @@
+[
+  {
+    "id": "discovery",
+    "nome": "Discovery",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=discovery"
+  },
+  {
+    "id": "sportv1",
+    "nome": "SporTV 1",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=sportv1"
+  },
+  {
+    "id": "sportv2",
+    "nome": "SporTV 2",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=sportv2"
+  },
+  {
+    "id": "sportv3",
+    "nome": "SporTV 3",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=sportv3"
+  },
+  {
+    "id": "premiereclubes",
+    "nome": "Premiere Clubes",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=premiereclubes"
+  },
+  {
+    "id": "premiere3",
+    "nome": "Premiere 3",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=premiere3"
+  },
+  {
+    "id": "bobojr",
+    "nome": "Bobo Jr",
+    "src": "https://redecanaistv.fm/player3/ch.php?canal=bobojr"
+  }
+]

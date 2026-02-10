@@ -1,4 +1,10 @@
 <<<<<<< HEAD
+.env
+public/cache/
+cache.sqlite3-*
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

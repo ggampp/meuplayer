@@ -6,9 +6,27 @@ const categories = [
   { key: "serie", label: "Séries" },
   { key: "anime", label: "Animes" },
 ];
-const IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
-const BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280";
-const STILL_BASE = "https://image.tmdb.org/t/p/w780";
+const IMAGE_BASE = "/api/image/tmdb/w500";
+const BACKDROP_BASE = "/api/image/tmdb/w1280";
+const STILL_BASE = "/api/image/tmdb/w780";
+const ROUTE_TO_TYPE = {
+  filme: "movie",
+  serie: "serie",
+  anime: "anime",
+};
+
+function getRouteTypeFromPath(pathname) {
+  const firstSegment = pathname.split("/").filter(Boolean)[0] || "";
+  return ROUTE_TO_TYPE[firstSegment] || null;
+}
+
+const ROUTE_TYPE = window.MEUPLAYER_ROUTE || getRouteTypeFromPath(window.location.pathname);
+
+function mediaTypeToRoute(type) {
+  if (type === "movie") return "filme";
+  if (type === "anime") return "anime";
+  return "serie";
+}
 
 function fetchJson(path) {
   return fetch(`${API_BASE}${path}`).then((res) => {
@@ -44,7 +62,19 @@ function buildPlayerUrl({ id, type, season, episode, provider }) {
   if (type === "movie") {
     return `https://superflixapi.one/filme/${id}`;
   }
+  if (type === "anime") {
+    return `https://superflixapi.one/anime/${id}/${seasonValue}/${episodeValue}`;
+  }
   return `https://superflixapi.one/serie/${id}/${seasonValue}/${episodeValue}`;
+}
+
+function isReleased(meta) {
+  if (!meta) return true;
+  const dateText = meta.release_date || meta.first_air_date;
+  if (!dateText) return true;
+  const parsed = Date.parse(dateText);
+  if (!parsed) return true;
+  return parsed <= Date.now();
 }
 
 function GridRow({ title, items, onSelect, hasMore, onMore }) {
@@ -110,56 +140,17 @@ function GridRow({ title, items, onSelect, hasMore, onMore }) {
   );
 }
 
-function CalendarSection({ items }) {
-  if (!items.length) {
-    return (
-      <section className="calendar" id="calendar">
-        <h2>Calendário</h2>
-        <p className="rows__status">Nenhum episódio recente.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="calendar" id="calendar">
-      <h2>Calendário</h2>
-      <div className="calendar__grid">
-        {items.slice(0, 12).map((item, index) => {
-          const title = item.title || item.name || item.titulo || "Episódio";
-          const episode = item.episode || item.ep || item.episodio;
-          const season = item.season || item.temporada;
-          const date = item.air_date || item.date || item.data;
-          return (
-            <div className="calendar__card" key={`${title}-${index}`}>
-              <div className="calendar__title">{title}</div>
-              <div className="calendar__meta">
-                {season ? `Temporada ${season}` : "Temporada N/D"}
-              </div>
-              <div className="calendar__meta">
-                {episode ? `Episódio ${episode}` : "Episódio N/D"}
-              </div>
-              <div className="calendar__meta">
-                {date ? `Data: ${date}` : "Data não informada"}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 function App() {
   const [lists, setLists] = useState({});
-  const [calendar, setCalendar] = useState([]);
   const [status, setStatus] = useState("Carregando...");
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [order, setOrder] = useState("asc");
+  const [typeFilter, setTypeFilter] = useState(ROUTE_TYPE || "all");
   const [genreFilter, setGenreFilter] = useState("all");
   const [genres, setGenres] = useState({ movie: [], tv: [] });
   const [searchResults, setSearchResults] = useState(null);
+  const [genreResults, setGenreResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [loadingGenre, setLoadingGenre] = useState(false);
   const [displayCounts, setDisplayCounts] = useState({
     movie: 10,
     serie: 10,
@@ -187,15 +178,22 @@ function App() {
     async function load() {
       try {
         setStatus("Carregando...");
+        const categoriesToFetch =
+          typeFilter === "all"
+            ? categories
+            : categories.filter((category) => category.key === typeFilter);
         const results = await Promise.all(
-          categories.map((category) =>
+          categoriesToFetch.map((category) =>
             fetchJson(
-              `/api/lista?category=${category.key}&type=tmdb&format=json&order=${order}`
+              `/api/lista?category=${category.key}&type=tmdb&format=json&order=desc`
             ).then(normalizeList)
           )
         );
         const next = {};
-        categories.forEach((category, index) => {
+        categories.forEach((category) => {
+          next[category.key] = [];
+        });
+        categoriesToFetch.forEach((category, index) => {
           next[category.key] = results[index];
         });
         setLists(next);
@@ -206,16 +204,7 @@ function App() {
       }
     }
     load();
-  }, [order]);
-
-  useEffect(() => {
-    fetchJson("/api/calendario")
-      .then((data) => setCalendar(Array.isArray(data) ? data : []))
-      .catch((error) => {
-        console.error(error);
-        setCalendar([]);
-      });
-  }, []);
+  }, [typeFilter, genreFilter]);
 
   useEffect(() => {
     Promise.all([
@@ -228,6 +217,57 @@ function App() {
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (genreFilter === "all") {
+      setGenreResults(null);
+      setLoadingGenre(false);
+      return;
+    }
+
+    let active = true;
+    setLoadingGenre(true);
+    const [filterType, filterId] = genreFilter.split(":");
+    const apiType = filterType === "movie" ? "movie" : "tv";
+    const targetType = apiType === "movie"
+      ? "movie"
+      : typeFilter === "anime"
+        ? "anime"
+        : "serie";
+
+    fetchJson(
+      `/api/tmdb/discover?type=${apiType}&genre=${encodeURIComponent(filterId)}&page=1`
+    )
+      .then((data) => {
+        if (!active) return;
+        const items = (data?.results || []).slice(0, 50).filter(isReleased);
+        const nextResults = { movie: [], serie: [], anime: [] };
+        const nextMeta = {};
+        nextResults[targetType] = items.map((item) => ({
+          id: String(item.id),
+          type: targetType,
+          meta: item,
+        }));
+        items.forEach((item) => {
+          nextMeta[`${targetType}-${item.id}`] = item;
+        });
+        setMetaMap((prev) => ({ ...prev, ...nextMeta }));
+        setGenreResults(nextResults);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (active) {
+          setGenreResults({ movie: [], serie: [], anime: [] });
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingGenre(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [genreFilter, typeFilter]);
 
   useEffect(() => {
     const term = search.trim();
@@ -268,7 +308,7 @@ function App() {
           const nextResults = { movie: [], serie: [], anime: [] };
           const nextMeta = {};
           results.forEach((result) => {
-            const items = (result.data?.results || []).slice(0, 50);
+            const items = (result.data?.results || []).slice(0, 50).filter(isReleased);
             if (result.type === "movie") {
               nextResults.movie = items.map((item) => ({
                 id: String(item.id),
@@ -279,13 +319,14 @@ function App() {
                 nextMeta[`movie-${item.id}`] = item;
               });
             } else {
-              nextResults.serie = items.map((item) => ({
+              const targetType = typeFilter === "anime" ? "anime" : "serie";
+              nextResults[targetType] = items.map((item) => ({
                 id: String(item.id),
-                type: "serie",
+                type: targetType,
                 meta: item,
               }));
               items.forEach((item) => {
-                nextMeta[`serie-${item.id}`] = item;
+                nextMeta[`${targetType}-${item.id}`] = item;
               });
             }
           });
@@ -308,11 +349,14 @@ function App() {
   }, [search, typeFilter]);
 
   useEffect(() => {
+    const sourceLists = searchResults || genreResults || lists;
     const items = [];
     categories.forEach((category) => {
-      const list = lists[category.key] || [];
+      const list = sourceLists[category.key] || [];
       const limit = displayCounts[category.key] || 10;
-      list.slice(0, limit).forEach((id) => {
+      list.slice(0, limit).forEach((entry) => {
+        const id = typeof entry === "object" ? entry.id : entry;
+        if (!id) return;
         const key = `${category.key}-${id}`;
         if (!metaMap[key]) {
           items.push({ id, type: category.key, key });
@@ -344,13 +388,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [lists, metaMap, displayCounts]);
-
-  const featured = useMemo(() => {
-    const id =
-      lists.movie?.[0] || lists.serie?.[0] || lists.anime?.[0] || "";
-    return { id, type: lists.movie?.[0] ? "movie" : "serie" };
-  }, [lists]);
+  }, [lists, searchResults, genreResults, metaMap, displayCounts]);
 
   const selectedMeta = useMemo(() => {
     if (!selected) return null;
@@ -366,7 +404,7 @@ function App() {
 
   const filteredRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    const sourceLists = searchResults || lists;
+    const sourceLists = searchResults || genreResults || lists;
     return categories.map((category) => {
       let items =
         (sourceLists[category.key] || []).map((entry) => {
@@ -379,8 +417,8 @@ function App() {
             meta: metaMap[`${category.key}-${entry}`],
           };
         }) || [];
+      items = items.filter((item) => isReleased(item.meta));
       const limit = displayCounts[category.key] || 10;
-      items = items.slice(0, limit);
       if (normalized && !searchResults) {
         items = items.filter((item) => {
           const meta = item.meta || {};
@@ -414,10 +452,13 @@ function App() {
           return ids.includes(filterId);
         });
       }
-      if (order === "desc") {
-        items = [...items].reverse();
-      }
-      const total = (sourceLists[category.key] || []).length;
+      items = [...items].sort((a, b) => {
+        const aDate = a.meta?.release_date || a.meta?.first_air_date || "";
+        const bDate = b.meta?.release_date || b.meta?.first_air_date || "";
+        return (Date.parse(bDate) || 0) - (Date.parse(aDate) || 0);
+      });
+      const total = items.length;
+      items = items.slice(0, limit);
       return {
         key: category.key,
         title: category.label,
@@ -430,9 +471,9 @@ function App() {
     metaMap,
     search,
     typeFilter,
-    order,
     genreFilter,
     searchResults,
+    genreResults,
     displayCounts,
   ]);
 
@@ -488,9 +529,10 @@ function App() {
   };
 
   const syncUrl = (item, replace = false) => {
-    const path =
-      item && item.id
-        ? `/${item.type === "movie" ? "filme" : "serie"}/${item.id}`
+    const path = item && item.id
+      ? `/${mediaTypeToRoute(item.type)}/${item.id}`
+      : ROUTE_TYPE
+        ? `/${mediaTypeToRoute(ROUTE_TYPE)}`
         : "/";
     if (replace) {
       window.history.replaceState({}, "", path);
@@ -561,9 +603,12 @@ function App() {
   useEffect(() => {
     const handlePop = () => {
       const parts = window.location.pathname.split("/").filter(Boolean);
-      if (parts.length === 2 && (parts[0] === "filme" || parts[0] === "serie")) {
+      if (
+        parts.length === 2 &&
+        (parts[0] === "filme" || parts[0] === "serie" || parts[0] === "anime")
+      ) {
         const id = parts[1];
-        const type = parts[0] === "filme" ? "movie" : "serie";
+        const type = ROUTE_TO_TYPE[parts[0]] || "movie";
         const item = { id, type };
         setSelected(item);
         ensureMeta(item);
@@ -591,8 +636,10 @@ function App() {
   const rowsLabel = useMemo(() => {
     if (searching) return "Buscando na API...";
     if (searchResults) return "Resultados da pesquisa";
+    if (loadingGenre) return "Filtrando por gênero na API...";
+    if (genreResults) return "Resultados por gênero";
     return status;
-  }, [searching, searchResults, status]);
+  }, [searching, searchResults, loadingGenre, genreResults, status]);
 
   const handleMore = (key) => {
     setDisplayCounts((prev) => ({
@@ -714,7 +761,7 @@ function App() {
                         className="episode-card"
                         onClick={() =>
                           openModal(
-                            { id: selected.id, type: "serie" },
+                            { id: selected.id, type: selected.type },
                             String(episode.season_number || seasonNumber),
                             String(episode.episode_number)
                           )
@@ -802,90 +849,50 @@ function App() {
           </section>
         ) : (
         <>
-        <section id="hero" className="hero">
-          <div className="hero__content">
-            <p className="hero__eyebrow">Streaming rápido</p>
-            <h1>Assista agora sem complicação</h1>
-            <p className="hero__subtitle">
-              Explore filmes, séries e animes usando a API SuperFlix.
-            </p>
-            <div className="hero__actions">
-              <button
-                className="btn btn--primary"
-                onClick={() => openModal(featured)}
-                disabled={!featured.id}
+        <header className="catalog-header">
+          <section className="filters">
+            <label>
+              Tipo
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="all">Todos</option>
+                <option value="movie">Filmes</option>
+                <option value="serie">Séries</option>
+                <option value="anime">Animes</option>
+              </select>
+            </label>
+            <label>
+              Busca
+              <input
+                type="search"
+                placeholder="Buscar por nome ou ID"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <label>
+              Gênero
+              <select
+                value={genreFilter}
+                onChange={(e) => setGenreFilter(e.target.value)}
               >
-                Reproduzir
-              </button>
-              <button
-                className="btn btn--ghost"
-                onClick={() => openDetail(featured)}
-                disabled={!featured.id}
-              >
-                Ver detalhes
-              </button>
-              <a className="btn btn--ghost" href="canais.html">
-                Canais ao vivo
-              </a>
-            </div>
-            <p className="hero__meta">
-              {featured.id
-                ? `ID em destaque: ${featured.id}`
-                : "Carregando catálogo..."}
-            </p>
-          </div>
-          <div className="hero__backdrop" aria-hidden="true"></div>
-        </section>
-
-        <section className="filters">
-          <label>
-            Tipo
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-              <option value="all">Todos</option>
-              <option value="movie">Filmes</option>
-              <option value="serie">Séries</option>
-              <option value="anime">Animes</option>
-            </select>
-          </label>
-          <label>
-            Busca
-            <input
-              type="search"
-              placeholder="Buscar por nome ou ID"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-          <label>
-            Gênero
-            <select
-              value={genreFilter}
-              onChange={(e) => setGenreFilter(e.target.value)}
-            >
-              <option value="all">Todos</option>
-              {genreOptions.map((genre) => (
-                <option key={genre.value} value={genre.value}>
-                  {genre.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Ordenação
-            <select value={order} onChange={(e) => setOrder(e.target.value)}>
-              <option value="asc">Crescente</option>
-              <option value="desc">Decrescente</option>
-            </select>
-          </label>
-          <label>
-            Limite por lista
-            <input
-              type="text"
-              value="10 itens (use Mais)"
-              readOnly
-            />
-          </label>
-        </section>
+                <option value="all">Todos</option>
+                {genreOptions.map((genre) => (
+                  <option key={genre.value} value={genre.value}>
+                    {genre.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Limite por lista
+              <input
+                type="text"
+                value="10 itens (use Mais)"
+                readOnly
+              />
+            </label>
+          </section>
+        </header>
 
         <section id="rows" className="rows">
           <div className="rows__header">
@@ -906,16 +913,6 @@ function App() {
           </div>
         </section>
 
-        <CalendarSection items={calendar} />
-
-        <section className="about" id="about">
-          <h2>Como funciona</h2>
-          <p>
-            Este frontend consome a API SuperFlix via proxy em Python, listando
-            IDs e embutindo o player oficial usando iframe. Selecione um item e
-            reproduza.
-          </p>
-        </section>
         </>
         )}
       </main>
