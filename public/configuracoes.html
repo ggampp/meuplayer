@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer · Configurações</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,144,400;1,144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <script src="/nav.js"></script>
+    <main class="settings-page">
+      <header class="settings-page__header">
+        <p class="settings-page__eyebrow">Preferências</p>
+        <h1 class="settings-page__title">Configurações</h1>
+        <p class="settings-page__lead">
+          A chave do TMDB é usada para capas, sinopses, temporadas e busca no
+          catálogo. Ela fica salva apenas neste computador.
+        </p>
+      </header>
+
+      <form class="settings-form" id="settingsForm">
+        <div class="settings-form__status" id="settingsStatus" role="status">
+          Carregando…
+        </div>
+
+        <label class="settings-form__field">
+          <span>Chave da API TMDB</span>
+          <input
+            type="password"
+            id="tmdbApiKey"
+            name="tmdbApiKey"
+            autocomplete="off"
+            placeholder="Cole sua chave v3 do TMDB"
+            spellcheck="false"
+          />
+        </label>
+
+        <p class="settings-form__hint" id="keyHint"></p>
+
+        <div class="settings-form__actions">
+          <button type="submit" class="btn btn--primary">Salvar</button>
+          <button type="button" class="btn btn--ghost" id="clearKeyBtn">
+            Remover chave
+          </button>
+        </div>
+      </form>
+
+      <section class="settings-help">
+        <h2 class="settings-help__title">Como obter a chave</h2>
+        <ol>
+          <li>
+            Crie uma conta em
+            <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">themoviedb.org/settings/api</a>.
+          </li>
+          <li>Solicite uma chave do tipo <strong>Developer</strong> (API v3).</li>
+          <li>Cole a chave acima e clique em <strong>Salvar</strong>.</li>
+        </ol>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        const form = document.getElementById("settingsForm");
+        const statusEl = document.getElementById("settingsStatus");
+        const keyInput = document.getElementById("tmdbApiKey");
+        const keyHint = document.getElementById("keyHint");
+        const clearBtn = document.getElementById("clearKeyBtn");
+
+        function setStatus(message, type) {
+          statusEl.textContent = message;
+          statusEl.className = "settings-form__status";
+          if (type) statusEl.classList.add(`settings-form__status--${type}`);
+        }
+
+        async function loadSettings() {
+          const response = await fetch("/api/settings");
+          if (!response.ok) throw new Error("Falha ao carregar");
+          const data = await response.json();
+          if (data.hasTmdbKey) {
+            setStatus(`Chave configurada (${data.tmdbKeyPreview})`, "ok");
+            keyHint.textContent =
+              "Deixe o campo em branco e salve para manter a chave atual, ou use Remover chave.";
+          } else {
+            setStatus("Nenhuma chave configurada — o catálogo TMDB ficará limitado.", "warn");
+            keyHint.textContent = "";
+          }
+        }
+
+        async function saveSettings(payload) {
+          const response = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Não foi possível salvar");
+          }
+          return data;
+        }
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const key = keyInput.value.trim();
+          if (!key) {
+            setStatus("Informe a chave ou use Remover chave.", "warn");
+            return;
+          }
+          setStatus("Salvando…", "");
+          try {
+            const data = await saveSettings({ tmdbApiKey: key });
+            keyInput.value = "";
+            setStatus(
+              data.hasTmdbKey
+                ? `Chave salva (${data.tmdbKeyPreview}).`
+                : "Chave removida.",
+              data.hasTmdbKey ? "ok" : "warn"
+            );
+            keyHint.textContent = data.hasTmdbKey
+              ? "Pronto. Volte ao catálogo para buscar filmes e séries."
+              : "";
+          } catch (error) {
+            setStatus(error.message || "Erro ao salvar.", "error");
+          }
+        });
+
+        clearBtn.addEventListener("click", async () => {
+          setStatus("Removendo…", "");
+          try {
+            const data = await saveSettings({ tmdbApiKey: "" });
+            keyInput.value = "";
+            setStatus("Chave removida.", "warn");
+            keyHint.textContent = "";
+          } catch (error) {
+            setStatus(error.message || "Erro ao remover.", "error");
+          }
+        });
+
+        loadSettings().catch(() => {
+          setStatus("Erro ao carregar configurações.", "error");
+        });
+      })();
+    </script>
+  </body>
+</html>

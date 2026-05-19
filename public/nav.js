@@ -5,7 +5,11 @@
     { label: 'Animes', path: '/anime' },
     { label: 'Canais', path: '/canais' },
     { label: 'Rede Buzz', path: '/rede-buzz' },
+    { label: 'Buzz Favoritos', path: '/rede-buzz-favoritos' },
+    { label: 'Configurações', path: '/configuracoes' },
   ];
+
+  const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime']);
 
   const style = document.createElement('style');
   style.textContent = `
@@ -15,9 +19,10 @@
       z-index: 50;
       display: flex;
       align-items: center;
-      gap: var(--space-2xs);
-      padding: 0 var(--space-md);
-      height: 52px;
+      flex-wrap: wrap;
+      gap: var(--space-2xs) var(--space-sm);
+      padding: var(--space-2xs) var(--space-md);
+      min-height: 52px;
       background: oklch(16% 0.02 250 / 0.92);
       border-bottom: 1px solid var(--color-rule);
       backdrop-filter: blur(10px);
@@ -62,6 +67,18 @@
       outline: 2px solid var(--color-focus);
       outline-offset: 2px;
     }
+    .app-nav__filters {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex: 1 1 280px;
+      justify-content: flex-end;
+      margin-left: auto;
+      min-width: 0;
+    }
+    .app-nav__filters:empty {
+      display: none;
+    }
     @media (max-width: 520px) {
       .app-nav {
         padding: 0 var(--space-sm);
@@ -74,11 +91,22 @@
         padding: 0.35rem 0.6rem;
         font-size: 0.78rem;
       }
+      .app-nav__filters {
+        flex: 1 1 100%;
+        order: 10;
+        margin-left: 0;
+        justify-content: stretch;
+      }
     }
   `;
   document.head.appendChild(style);
 
   const currentPath = window.location.pathname;
+
+  function isCatalogListPage() {
+    const path = currentPath.replace(/\/$/, '') || '/';
+    return CATALOG_LIST_PATHS.has(path);
+  }
 
   function isActive(linkPath) {
     if (linkPath === '/') return currentPath === '/';
@@ -102,6 +130,14 @@
     a.textContent = label;
     nav.appendChild(a);
   });
+
+  if (isCatalogListPage()) {
+    const filtersSlot = document.createElement('div');
+    filtersSlot.id = 'catalogFilters';
+    filtersSlot.className = 'app-nav__filters';
+    filtersSlot.setAttribute('aria-label', 'Filtros do catálogo');
+    nav.appendChild(filtersSlot);
+  }
 
   function inject() {
     document.body.insertBefore(nav, document.body.firstChild);

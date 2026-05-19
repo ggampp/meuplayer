@@ -23,16 +23,135 @@ def load_env(path):
             os.environ.setdefault(key.strip(), value.strip())
 
 
-ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
 load_env(ENV_PATH)
+
+
+def user_data_dir():
+    return os.environ.get("MEUPLAYER_USER_DATA", BASE_DIR)
+
+
+def settings_file_path():
+    return os.path.join(user_data_dir(), "settings.json")
+
+
+def load_settings_file():
+    path = settings_file_path()
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_settings_file(data):
+    directory = user_data_dir()
+    os.makedirs(directory, exist_ok=True)
+    path = settings_file_path()
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+
+
+def apply_user_settings():
+    settings = load_settings_file()
+    key = str(settings.get("tmdbApiKey") or "").strip()
+    if key:
+        os.environ["TMDB_API_KEY"] = key
+
+
+apply_user_settings()
 
 API_BASE = "https://superflixapi.one"
 RDE_API_BASE = "https://reidosembeds.com/api"
+RDE_ADULT_CATEGORY = "adulto"
 TMDB_BASE = "https://api.themoviedb.org/3"
+
+
+def _normalize_rde_category(value):
+    return str(value or "").strip().lower()
+
+
+def _is_rde_adult_category(value):
+    return _normalize_rde_category(value) == RDE_ADULT_CATEGORY
+
+
+def _rde_channel_is_adult(channel):
+    if not isinstance(channel, dict):
+        return False
+    for key in ("category", "category_id", "categoryId"):
+        if _is_rde_adult_category(channel.get(key)):
+            return True
+    return False
+
+
+def _filter_rde_channels(items):
+    if not isinstance(items, list):
+        return items
+    return [item for item in items if not _rde_channel_is_adult(item)]
+
+
+def _filter_rde_categories(items):
+    if not isinstance(items, list):
+        return items
+    return [
+        item
+        for item in items
+        if not (
+            isinstance(item, dict)
+            and (
+                _is_rde_adult_category(item.get("id"))
+                or _is_rde_adult_category(item.get("name"))
+            )
+        )
+    ]
+
+
+def filter_rede_buzz_payload(data):
+    if not isinstance(data, dict):
+        return data
+
+    payload = data.get("data")
+    if isinstance(payload, list):
+        if payload and isinstance(payload[0], dict) and "embed_url" not in payload[0]:
+            filtered = _filter_rde_categories(payload)
+        else:
+            filtered = _filter_rde_channels(payload)
+        data = {**data, "data": filtered}
+        if "total" in data:
+            data["total"] = len(filtered)
+    elif isinstance(payload, dict):
+        if isinstance(payload.get("channels"), list):
+            channels = _filter_rde_channels(payload["channels"])
+            data = {**data, "data": {**payload, "channels": channels}}
+        elif _rde_channel_is_adult(payload):
+            data = {**data, "data": None}
+    return data
+
+
+def sanitize_rede_buzz_json_body(body):
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return body
+    filtered = filter_rede_buzz_payload(payload)
+    return json.dumps(filtered, ensure_ascii=False).encode("utf-8")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
-TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "public")
-DB_PATH = os.path.join(os.path.dirname(__file__), "cache.sqlite3")
+def get_tmdb_api_key():
+    return os.getenv("TMDB_API_KEY", "").strip()
+
+
+def mask_tmdb_api_key(key):
+    key = str(key or "").strip()
+    if len(key) <= 8:
+        return "••••" if key else ""
+    return f"{key[:4]}…{key[-4:]}"
+STATIC_DIR = os.environ.get("MEUPLAYER_STATIC_DIR") or os.path.join(BASE_DIR, "public")
+DB_PATH = os.path.join(user_data_dir(), "cache.sqlite3")
 IMAGE_CACHE_DIR = os.path.join(STATIC_DIR, "cache", "images", "tmdb")
 
 TTL_GUIA_SECONDS = 30 * 60
@@ -162,6 +281,8 @@ def _warm_tmdb_images(meta):
             pass
 
 
+os.makedirs(user_data_dir(), exist_ok=True)
+os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
 DB_CONN = _connect_cache_db()
 os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
 
@@ -217,6 +338,12 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         message = format % args
         if "10053" in message or "10054" in message:
             return
+        if len(args) >= 2:
+            try:
+                if int(args[1]) < 400:
+                    return
+            except (TypeError, ValueError):
+                pass
         super().log_message(format, *args)
 
     def log_error(self, format, *args):
@@ -300,7 +427,68 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/rede-buzz/search":
             self._proxy_rede_buzz_search(parsed.query)
             return
+        if parsed.path == "/api/settings":
+            self._api_settings_get()
+            return
         super().do_GET()
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/settings":
+            self._api_settings_post()
+            return
+        self.send_error(404)
+
+    def _read_json_body(self, max_bytes=4096):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        if length <= 0:
+            return {}
+        if length > max_bytes:
+            raise ValueError("Corpo da requisição muito grande")
+        raw = self.rfile.read(length)
+        return json.loads(raw.decode("utf-8"))
+
+    def _api_settings_get(self):
+        settings = load_settings_file()
+        key = get_tmdb_api_key()
+        payload = {
+            "hasTmdbKey": bool(key),
+            "tmdbKeyPreview": mask_tmdb_api_key(key),
+        }
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self._send_response(200, "application/json; charset=utf-8", body)
+
+    def _api_settings_post(self):
+        try:
+            payload = self._read_json_body()
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._send_json_error(400, "JSON inválido", str(exc))
+            return
+
+        settings = load_settings_file()
+        if "tmdbApiKey" in payload:
+            key = str(payload.get("tmdbApiKey") or "").strip()
+            if key:
+                settings["tmdbApiKey"] = key
+            else:
+                settings.pop("tmdbApiKey", None)
+                os.environ.pop("TMDB_API_KEY", None)
+
+        try:
+            save_settings_file(settings)
+            apply_user_settings()
+        except OSError as exc:
+            self._send_json_error(500, "Não foi possível salvar", str(exc))
+            return
+
+        key = get_tmdb_api_key()
+        response = {
+            "ok": True,
+            "hasTmdbKey": bool(key),
+            "tmdbKeyPreview": mask_tmdb_api_key(key),
+        }
+        body = json.dumps(response, ensure_ascii=False).encode("utf-8")
+        self._send_response(200, "application/json; charset=utf-8", body)
 
     def _resolve_site_route(self, path):
         if path in ("", "/"):
@@ -309,6 +497,10 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             return "/canais.html"
         if path in ("/rede-buzz", "/rede-buzz/"):
             return "/rede-buzz.html"
+        if path in ("/rede-buzz-favoritos", "/rede-buzz-favoritos/"):
+            return "/rede-buzz-favoritos.html"
+        if path in ("/configuracoes", "/configuracoes/"):
+            return "/configuracoes.html"
         route_map = {
             "/filme": "/filme.html",
             "/anime": "/anime.html",
@@ -582,12 +774,12 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             self._send_json_error(502, "Falha ao acessar o TMDB", str(exc))
 
     def _ensure_tmdb_key(self):
-        if TMDB_API_KEY:
+        if get_tmdb_api_key():
             return True
         self._send_json_error(
             400,
             "TMDB_API_KEY não configurada",
-            "Defina a variável de ambiente TMDB_API_KEY",
+            "Abra Configurações no menu e informe sua chave do TMDB",
         )
         return False
 
@@ -611,7 +803,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
                     pass
             return cached["body"], cached["content_type"], "HIT"
 
-        url = f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}?api_key={TMDB_API_KEY}&language=pt-BR"
+        url = f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}?api_key={get_tmdb_api_key()}&language=pt-BR"
         try:
             req = Request(url, headers={"User-Agent": "MeuPlayer/1.0"})
             with urlopen(req, timeout=15) as response:
@@ -718,7 +910,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         media_type = params.get("type", ["movie"])[0]
         tmdb_media = "movie" if media_type == "movie" else "tv"
         cache_key = f"genres:{tmdb_media}:pt-BR"
-        url = f"{TMDB_BASE}/genre/{tmdb_media}/list?api_key={TMDB_API_KEY}&language=pt-BR"
+        url = f"{TMDB_BASE}/genre/{tmdb_media}/list?api_key={get_tmdb_api_key()}&language=pt-BR"
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_GENRES_SECONDS)
 
     def _proxy_tmdb_search(self, query):
@@ -736,7 +928,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         cache_key = f"search:{tmdb_media}:{term.lower()}:pt-BR"
         url = (
             f"{TMDB_BASE}/search/{tmdb_media}"
-            f"?api_key={TMDB_API_KEY}&language=pt-BR&query={quote_plus(term)}"
+            f"?api_key={get_tmdb_api_key()}&language=pt-BR&query={quote_plus(term)}"
             "&include_adult=false&page=1"
         )
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_SEARCH_SECONDS)
@@ -781,7 +973,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         )
         url = (
             f"{TMDB_BASE}/discover/{tmdb_media}"
-            f"?api_key={TMDB_API_KEY}"
+            f"?api_key={get_tmdb_api_key()}"
             f"&language=pt-BR"
             f"{genre_filter}"
             f"&include_adult=false"
@@ -806,7 +998,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         cache_key = f"season:{tmdb_id}:{season_number}:pt-BR"
         url = (
             f"{TMDB_BASE}/tv/{tmdb_id}/season/{season_number}"
-            f"?api_key={TMDB_API_KEY}&language=pt-BR"
+            f"?api_key={get_tmdb_api_key()}&language=pt-BR"
         )
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_SEASON_SECONDS)
 
@@ -825,7 +1017,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         cache_key = f"related:{tmdb_media}:{tmdb_id}:pt-BR"
         url = (
             f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}/recommendations"
-            f"?api_key={TMDB_API_KEY}&language=pt-BR&page=1"
+            f"?api_key={get_tmdb_api_key()}&language=pt-BR&page=1"
         )
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_RELATED_SECONDS)
 
@@ -833,10 +1025,11 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
     def _proxy_rede_buzz_remote(self, url, cache_key):
         cached = self._cache_get(cache_key)
         if cached:
+            body = sanitize_rede_buzz_json_body(cached["body"])
             self._send_response(
                 cached["status"],
                 cached["content_type"],
-                cached["body"],
+                body,
                 cache_status="HIT",
             )
             return
@@ -848,6 +1041,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
                     "Content-Type", "application/json; charset=utf-8"
                 )
                 if response.status == 200:
+                    body = sanitize_rede_buzz_json_body(body)
                     self._cache_set(
                         cache_key=cache_key,
                         status=response.status,
@@ -862,6 +1056,13 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
     def _proxy_rede_buzz_channels(self, query):
         params = parse_qs(query)
         category = params.get("category", [""])[0].strip()
+        if _is_rde_adult_category(category):
+            empty = json.dumps(
+                {"success": True, "data": [], "total": 0},
+                ensure_ascii=False,
+            ).encode("utf-8")
+            self._send_response(200, "application/json; charset=utf-8", empty)
+            return
         if category:
             url = (
                 f"{RDE_API_BASE}/channels"

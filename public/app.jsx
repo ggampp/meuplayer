@@ -7,25 +7,6 @@ const categories = [
   { key: "anime", label: "Animes", eyebrow: "Animação" },
 ];
 
-const LANGUAGE_OPTIONS = [
-  { value: "all", label: "Todos os idiomas" },
-  { value: "pt", label: "Português" },
-  { value: "en", label: "Inglês" },
-  { value: "es", label: "Espanhol" },
-  { value: "ko", label: "Coreano" },
-  { value: "ja", label: "Japonês" },
-  { value: "zh", label: "Chinês" },
-  { value: "fr", label: "Francês" },
-  { value: "de", label: "Alemão" },
-  { value: "it", label: "Italiano" },
-  { value: "hi", label: "Hindi" },
-  { value: "th", label: "Tailandês" },
-  { value: "vi", label: "Vietnamita" },
-  { value: "id", label: "Indonésio" },
-  { value: "tr", label: "Turco" },
-  { value: "ru", label: "Russo" },
-  { value: "ar", label: "Árabe" },
-];
 const IMAGE_BASE = "/api/image/tmdb/w500";
 const BACKDROP_BASE = "/api/image/tmdb/w1280";
 const STILL_BASE = "/api/image/tmdb/w780";
@@ -106,15 +87,6 @@ function buildPlayerUrl({ id, type, season, episode, provider }) {
 
 const ANIMATION_GENRE_ID = 16;
 
-function matchesOriginalLanguage(meta, languageFilter) {
-  if (!languageFilter || languageFilter === "all") return true;
-  if (!meta) return false;
-  const lang = (meta.original_language || "").toLowerCase();
-  if (lang === languageFilter) return true;
-  if (languageFilter === "zh" && (lang === "cn" || lang === "tw")) return true;
-  return false;
-}
-
 function isAnimationTv(meta) {
   if (!meta) return false;
   const genreIds = [...(meta.genre_ids || [])];
@@ -133,12 +105,9 @@ function categoriesForTypeFilter(typeFilter) {
   return categories.filter((category) => category.key === typeFilter);
 }
 
-function buildDiscoverParams(apiType, { genreId, language, page = "1" } = {}) {
+function buildDiscoverParams(apiType, { genreId, page = "1" } = {}) {
   const params = new URLSearchParams({ type: apiType, page });
   if (genreId) params.set("genre", genreId);
-  if (language && language !== "all") {
-    params.set("original_language", language);
-  }
   return params;
 }
 
@@ -183,6 +152,40 @@ function typeLabel(type) {
   if (type === "movie") return "Filme";
   if (type === "anime") return "Anime";
   return "Série";
+}
+
+function seasonListFromMeta(meta) {
+  if (!meta?.seasons) return [];
+  return meta.seasons
+    .filter((season) => season.season_number !== 0)
+    .sort((a, b) => a.season_number - b.season_number);
+}
+
+function hasMultipleSeasons(meta) {
+  const list = seasonListFromMeta(meta);
+  if (list.length > 1) return true;
+  const count = Number(meta?.number_of_seasons);
+  return Number.isFinite(count) && count > 1;
+}
+
+/** Busca/discover trazem meta sem `seasons`; detalhe TMDB traz a lista completa. */
+function needsFullSeriesMeta(meta, type) {
+  if (type === "movie") return false;
+  if (!meta) return true;
+  if (!Array.isArray(meta.seasons)) return true;
+  const regular = seasonListFromMeta(meta);
+  const count = Number(meta.number_of_seasons);
+  if (regular.length > 1) return false;
+  if (Number.isFinite(count) && count > 1 && regular.length < count) {
+    return true;
+  }
+  return regular.length === 0;
+}
+
+function episodesFromSeasonData(seasonData) {
+  return (seasonData?.episodes || [])
+    .filter((episode) => episode.episode_number != null)
+    .sort((a, b) => a.episode_number - b.episode_number);
 }
 
 function MediaCard({ item, meta, onSelect, compact = false }) {
@@ -261,7 +264,53 @@ function GridRow({ title, eyebrow, status, items, onSelect, hasMore, onMore }) {
   );
 }
 
-function Hero({ featured, status, onWatch }) {
+function CatalogFilters({
+  search,
+  onSearchChange,
+  genreFilter,
+  onGenreChange,
+  genreOptions,
+  status,
+}) {
+  const slot = document.getElementById("catalogFilters");
+  if (!slot) return null;
+
+  return ReactDOM.createPortal(
+    <div className="app-nav__filters-inner">
+      <span className="app-nav__catalog-status" aria-live="polite">
+        {status}
+      </span>
+      <label className="filters__field filters__field--search">
+        <span className="visually-hidden">Buscar</span>
+        <input
+          type="search"
+          placeholder="Título, ID, original"
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          aria-label="Buscar por título, ID ou título original"
+        />
+      </label>
+      <label className="filters__field filters__field--genre">
+        <span className="visually-hidden">Gênero</span>
+        <select
+          value={genreFilter}
+          onChange={(event) => onGenreChange(event.target.value)}
+          aria-label="Filtrar por gênero"
+        >
+          <option value="all">Todos os gêneros</option>
+          {genreOptions.map((genre) => (
+            <option key={genre.value} value={genre.value}>
+              {genre.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>,
+    slot
+  );
+}
+
+function Hero({ featured, onWatch }) {
   if (!featured) {
     return (
       <section className="hero" aria-label="Destaque">
@@ -274,7 +323,6 @@ function Hero({ featured, status, onWatch }) {
           Filmes, séries e animes do TMDB tocados via SuperFlix — sem
           recomendações forçadas, sem perfis, sem anúncios.
         </p>
-        <p className="hero__meta">{status || "Carregando catálogo..."}</p>
       </section>
     );
   }
@@ -312,23 +360,20 @@ function Hero({ featured, status, onWatch }) {
         >
           Abrir detalhes
         </button>
-        <span className="hero__meta">{status}</span>
       </div>
     </section>
   );
 }
 
 function App() {
+  const typeFilter = ROUTE_TYPE || "all";
   const [lists, setLists] = useState({});
   const [status, setStatus] = useState("Carregando...");
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState(ROUTE_TYPE || "all");
   const [genreFilter, setGenreFilter] = useState("all");
-  const [languageFilter, setLanguageFilter] = useState("all");
   const [genres, setGenres] = useState({ movie: [], tv: [] });
   const [searchResults, setSearchResults] = useState(null);
   const [genreResults, setGenreResults] = useState(null);
-  const [languageResults, setLanguageResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [displayCounts, setDisplayCounts] = useState({
@@ -344,6 +389,7 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [seasonNumber, setSeasonNumber] = useState("1");
   const [seasonData, setSeasonData] = useState(null);
+  const [modalSeasonData, setModalSeasonData] = useState(null);
   const [relatedItems, setRelatedItems] = useState([]);
 
   useEffect(() => {
@@ -370,7 +416,7 @@ function App() {
 
   useEffect(() => {
     setDisplayCounts({ movie: 10, serie: 10, anime: 10 });
-  }, [typeFilter, genreFilter, languageFilter]);
+  }, [typeFilter, genreFilter]);
 
   useEffect(() => {
     Promise.all([
@@ -393,7 +439,6 @@ function App() {
       setLoadingCatalog(true);
       setStatus("Carregando...");
       setGenreResults(null);
-      setLanguageResults(null);
 
       try {
         if (genreFilter !== "all") {
@@ -401,7 +446,6 @@ function App() {
           const apiType = filterType === "movie" ? "movie" : "tv";
           const discoverParams = buildDiscoverParams(apiType, {
             genreId: filterId,
-            language: languageFilter,
           });
           const data = await fetchJson(
             `/api/tmdb/discover?${discoverParams.toString()}`
@@ -423,52 +467,6 @@ function App() {
           );
           setMetaMap((prev) => ({ ...prev, ...nextMeta }));
           setGenreResults(nextResults);
-          setStatus("Catálogo atualizado");
-          return;
-        }
-
-        if (languageFilter !== "all") {
-          const nextResults = emptyCatalog();
-          const nextMeta = {};
-          const requests = [];
-
-          if (typeFilter === "all" || typeFilter === "movie") {
-            requests.push(
-              fetchJson(
-                `/api/tmdb/discover?${buildDiscoverParams("movie", {
-                  language: languageFilter,
-                }).toString()}`
-              ).then((data) => ({ scope: "movie", data }))
-            );
-          }
-          if (typeFilter === "all" || typeFilter === "serie" || typeFilter === "anime") {
-            requests.push(
-              fetchJson(
-                `/api/tmdb/discover?${buildDiscoverParams("tv", {
-                  language: languageFilter,
-                }).toString()}`
-              ).then((data) => ({ scope: "tv", data }))
-            );
-          }
-
-          const responses = await Promise.all(requests);
-          if (!active) return;
-
-          responses.forEach(({ scope, data }) => {
-            const options = { tvAs: scope === "tv" };
-            if (typeFilter === "anime") options.onlyType = "anime";
-            else if (typeFilter === "serie") options.onlyType = "serie";
-            else if (typeFilter === "movie") options.onlyType = "movie";
-            applyDiscoverItems(
-              nextResults,
-              nextMeta,
-              (data?.results || []).slice(0, 50),
-              options
-            );
-          });
-
-          setMetaMap((prev) => ({ ...prev, ...nextMeta }));
-          setLanguageResults(nextResults);
           setStatus("Catálogo atualizado");
           return;
         }
@@ -501,7 +499,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [typeFilter, genreFilter, languageFilter, search]);
+  }, [typeFilter, genreFilter, search]);
 
   useEffect(() => {
     const term = search.trim();
@@ -542,12 +540,7 @@ function App() {
           const nextResults = emptyCatalog();
           const nextMeta = {};
           results.forEach((result) => {
-            let items = (result.data?.results || []).slice(0, 50).filter(isReleased);
-            if (languageFilter !== "all") {
-              items = items.filter((item) =>
-                matchesOriginalLanguage(item, languageFilter)
-              );
-            }
+            const items = (result.data?.results || []).slice(0, 50).filter(isReleased);
             if (result.type === "movie") {
               nextResults.movie = items.map((item) => ({
                 id: String(item.id),
@@ -585,11 +578,10 @@ function App() {
       active = false;
       clearTimeout(timer);
     };
-  }, [search, typeFilter, languageFilter]);
+  }, [search, typeFilter]);
 
   useEffect(() => {
-    const sourceLists =
-      searchResults || genreResults || languageResults || lists;
+    const sourceLists = searchResults || genreResults || lists;
     const pendingByType = {};
     categories.forEach((category) => {
       const list = sourceLists[category.key] || [];
@@ -631,25 +623,37 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [lists, searchResults, genreResults, languageResults, metaMap, displayCounts]);
+  }, [lists, searchResults, genreResults, metaMap, displayCounts]);
 
   const selectedMeta = useMemo(() => {
     if (!selected) return null;
     return metaMap[`${selected.type}-${selected.id}`] || null;
   }, [selected, metaMap]);
 
-  const seasonList = useMemo(() => {
-    if (!selectedMeta?.seasons) return [];
-    return selectedMeta.seasons
-      .filter((season) => season.season_number !== 0)
-      .sort((a, b) => a.season_number - b.season_number);
-  }, [selectedMeta]);
+  const seasonList = useMemo(
+    () => seasonListFromMeta(selectedMeta),
+    [selectedMeta]
+  );
+
+  const modalMeta = useMemo(() => {
+    if (!modal.id) return null;
+    return metaMap[`${modal.type}-${modal.id}`] || null;
+  }, [metaMap, modal.id, modal.type]);
+
+  const modalSeasonList = useMemo(
+    () => seasonListFromMeta(modalMeta),
+    [modalMeta]
+  );
+
+  const modalEpisodes = useMemo(
+    () => episodesFromSeasonData(modalSeasonData),
+    [modalSeasonData]
+  );
 
   const filteredRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    const sourceLists =
-      searchResults || genreResults || languageResults || lists;
-    const apiCatalog = Boolean(genreResults || languageResults);
+    const sourceLists = searchResults || genreResults || lists;
+    const apiCatalog = Boolean(genreResults);
     const visibleCategories = ROUTE_TYPE
       ? categories.filter((category) => category.key === ROUTE_TYPE)
       : typeFilter === "all"
@@ -725,7 +729,6 @@ function App() {
     genreFilter,
     searchResults,
     genreResults,
-    languageResults,
     displayCounts,
   ]);
 
@@ -773,18 +776,22 @@ function App() {
     setModal({ open: false, id: "", type: modal.type });
     setModalSeason("1");
     setModalEpisode("1");
+    setModalSeasonData(null);
   };
 
   const ensureMeta = async (item) => {
     const key = `${item.type}-${item.id}`;
-    if (metaMap[key]) return metaMap[key];
+    const existing = metaMap[key];
+    if (existing && !needsFullSeriesMeta(existing, item.type)) {
+      return existing;
+    }
     try {
       const data = await fetchJson(`/api/tmdb?type=${item.type}&id=${item.id}`);
       setMetaMap((prev) => ({ ...prev, [key]: data }));
       return data;
     } catch (error) {
       console.error(error);
-      return null;
+      return existing || null;
     }
   };
 
@@ -838,6 +845,61 @@ function App() {
         setSeasonData(null);
       });
   }, [selected, seasonNumber]);
+
+  useEffect(() => {
+    if (!modal.open || modal.type === "movie" || !modal.id) {
+      setModalSeasonData(null);
+      return;
+    }
+
+    let cancelled = false;
+    ensureMeta({ id: modal.id, type: modal.type }).then((meta) => {
+      if (cancelled || !meta) return;
+      const seasons = seasonListFromMeta(meta);
+      if (!seasons.length) return;
+      const seasonValid = seasons.some(
+        (season) => String(season.season_number) === String(modalSeason)
+      );
+      if (!seasonValid) {
+        setModalSeason(String(seasons[0].season_number));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modal.open, modal.id, modal.type]);
+
+  useEffect(() => {
+    if (!modal.open || modal.type === "movie" || !modal.id || !modalSeason) {
+      setModalSeasonData(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetchJson(`/api/tmdb/season?id=${modal.id}&season=${modalSeason}`)
+      .then((data) => {
+        if (!cancelled) setModalSeasonData(data);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) setModalSeasonData(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modal.open, modal.id, modal.type, modalSeason]);
+
+  useEffect(() => {
+    if (!modal.open || modal.type === "movie" || !modalEpisodes.length) return;
+    const episodeValid = modalEpisodes.some(
+      (episode) => String(episode.episode_number) === String(modalEpisode)
+    );
+    if (!episodeValid) {
+      setModalEpisode(String(modalEpisodes[0].episode_number));
+    }
+  }, [modal.open, modal.type, modalEpisodes, modalEpisode]);
 
   useEffect(() => {
     if (!selected) return;
@@ -897,35 +959,12 @@ function App() {
   );
 
   const rowsLabel = useMemo(() => {
-    const langLabel =
-      languageFilter !== "all"
-        ? LANGUAGE_OPTIONS.find((opt) => opt.value === languageFilter)?.label
-        : null;
     if (searching) return "Buscando na API...";
     if (loadingCatalog) return "Carregando catálogo...";
-    if (searchResults) {
-      return langLabel
-        ? `Resultados da busca · ${langLabel}`
-        : "Resultados da busca";
-    }
-    if (genreResults) {
-      return langLabel
-        ? `Filtro por gênero · ${langLabel}`
-        : "Filtro por gênero";
-    }
-    if (languageResults) {
-      return langLabel ? `Filtro por idioma · ${langLabel}` : "Filtro por idioma";
-    }
+    if (searchResults) return "Resultados da busca";
+    if (genreResults) return "Filtro por gênero";
     return status;
-  }, [
-    searching,
-    searchResults,
-    loadingCatalog,
-    genreResults,
-    languageResults,
-    status,
-    languageFilter,
-  ]);
+  }, [searching, searchResults, loadingCatalog, genreResults, status]);
 
   const handleMore = (key) => {
     setDisplayCounts((prev) => ({
@@ -933,20 +972,6 @@ function App() {
       [key]: (prev[key] || 10) + 10,
     }));
   };
-
-  const browseEyebrow = useMemo(() => {
-    if (ROUTE_TYPE === "movie") return "Catálogo · Filmes";
-    if (ROUTE_TYPE === "serie") return "Catálogo · Séries";
-    if (ROUTE_TYPE === "anime") return "Catálogo · Animes";
-    return "Catálogo · Tudo";
-  }, []);
-
-  const browseTitle = useMemo(() => {
-    if (ROUTE_TYPE === "movie") return "Filmes";
-    if (ROUTE_TYPE === "serie") return "Séries";
-    if (ROUTE_TYPE === "anime") return "Animes";
-    return "Tudo o que está no MeuPlayer";
-  }, []);
 
   if (selected) {
     const title = selectedMeta?.title || selectedMeta?.name || selected.id;
@@ -1048,19 +1073,23 @@ function App() {
                 <section className="detail__section">
                   <div className="detail__section-heading">
                     <h2 className="detail__section-title">Temporadas</h2>
-                    {seasonList.length > 1 ? (
+                    {seasonList.length > 1 || hasMultipleSeasons(selectedMeta) ? (
                       <select
                         className="detail__season-select"
                         value={seasonNumber}
                         onChange={(event) => setSeasonNumber(event.target.value)}
                         aria-label="Selecionar temporada"
+                        disabled={!seasonList.length}
                       >
+                        {!seasonList.length ? (
+                          <option value={seasonNumber}>Carregando…</option>
+                        ) : null}
                         {seasonList.map((season) => (
                           <option
                             key={season.season_number}
                             value={season.season_number}
                           >
-                            Temporada {season.season_number}
+                            {season.name || `Temporada ${season.season_number}`}
                           </option>
                         ))}
                       </select>
@@ -1204,33 +1233,80 @@ function App() {
             </div>
             <div className="control">
               <label htmlFor="modalSeason">Temporada</label>
-              <input
-                id="modalSeason"
-                type="number"
-                min="1"
-                value={modalSeason}
-                onChange={(event) => setModalSeason(event.target.value)}
-                disabled={modal.type === "movie"}
-              />
+              {modal.type === "movie" ? (
+                <input id="modalSeason" type="number" value="1" disabled readOnly />
+              ) : modalSeasonList.length > 1 || hasMultipleSeasons(modalMeta) ? (
+                <select
+                  id="modalSeason"
+                  value={modalSeason}
+                  onChange={(event) => setModalSeason(event.target.value)}
+                  disabled={!modalSeasonList.length}
+                >
+                  {!modalSeasonList.length ? (
+                    <option value={modalSeason}>Carregando…</option>
+                  ) : null}
+                  {modalSeasonList.map((season) => (
+                    <option
+                      key={season.season_number}
+                      value={season.season_number}
+                    >
+                      {season.name || `Temporada ${season.season_number}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="modalSeason"
+                  type="number"
+                  min="1"
+                  value={modalSeason}
+                  onChange={(event) => setModalSeason(event.target.value)}
+                />
+              )}
             </div>
             <div className="control">
               <label htmlFor="modalEpisode">Episódio</label>
-              <input
-                id="modalEpisode"
-                type="number"
-                min="1"
-                value={modalEpisode}
-                onChange={(event) => setModalEpisode(event.target.value)}
-                disabled={modal.type === "movie"}
-              />
+              {modal.type === "movie" ? (
+                <input id="modalEpisode" type="number" value="1" disabled readOnly />
+              ) : modalEpisodes.length ? (
+                <select
+                  id="modalEpisode"
+                  value={modalEpisode}
+                  onChange={(event) => setModalEpisode(event.target.value)}
+                >
+                  {modalEpisodes.map((episode) => (
+                    <option
+                      key={episode.id || episode.episode_number}
+                      value={episode.episode_number}
+                    >
+                      E{episode.episode_number}
+                      {episode.name ? ` · ${episode.name}` : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="modalEpisode"
+                  type="number"
+                  min="1"
+                  value={modalEpisode}
+                  onChange={(event) => setModalEpisode(event.target.value)}
+                  placeholder={modal.open ? "Carregando…" : ""}
+                />
+              )}
             </div>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => setModal({ ...modal })}
-            >
-              Atualizar
-            </button>
+            <div className="control control--action">
+              <span className="control__spacer" aria-hidden="true">
+                &nbsp;
+              </span>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => setModal({ ...modal })}
+              >
+                Atualizar
+              </button>
+            </div>
           </div>
           <div className="modal__player">
             {modal.open ? (
@@ -1249,66 +1325,16 @@ function App() {
 
   return (
     <>
+      <CatalogFilters
+        search={search}
+        onSearchChange={setSearch}
+        genreFilter={genreFilter}
+        onGenreChange={setGenreFilter}
+        genreOptions={genreOptions}
+        status={rowsLabel}
+      />
       <main>
-        <Hero featured={featured} status={rowsLabel} onWatch={openDetail} />
-
-        <section className="catalog-header" aria-label="Filtros do catálogo">
-          <header className="catalog-header__heading">
-            <p className="catalog-header__eyebrow">{browseEyebrow}</p>
-            <h2 className="catalog-header__title">{browseTitle}</h2>
-          </header>
-          <div className="filters">
-            <label className="filters__field">
-              Tipo
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                disabled={Boolean(ROUTE_TYPE)}
-              >
-                <option value="all">Todos</option>
-                <option value="movie">Filmes</option>
-                <option value="serie">Séries</option>
-                <option value="anime">Animes</option>
-              </select>
-            </label>
-            <label className="filters__field">
-              Busca
-              <input
-                type="search"
-                placeholder="Título, ID, original"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </label>
-            <label className="filters__field">
-              Gênero
-              <select
-                value={genreFilter}
-                onChange={(e) => setGenreFilter(e.target.value)}
-              >
-                <option value="all">Todos</option>
-                {genreOptions.map((genre) => (
-                  <option key={genre.value} value={genre.value}>
-                    {genre.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="filters__field">
-              Idioma original
-              <select
-                value={languageFilter}
-                onChange={(e) => setLanguageFilter(e.target.value)}
-              >
-                {LANGUAGE_OPTIONS.map((lang) => (
-                  <option key={lang.value} value={lang.value}>
-                    {lang.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </section>
+        <Hero featured={featured} onWatch={openDetail} />
 
         <section className="rows" id="rows">
           <div className="rows__container">
