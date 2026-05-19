@@ -1,24 +1,41 @@
 {
   "name": "meuplayer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MeuPlayer Desktop",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux",
-    "build:mac": "electron-builder --mac"
+    "build:server": "powershell -ExecutionPolicy Bypass -File scripts/build-server.ps1",
+    "build:win": "npm run build:server && electron-builder --win",
+    "build:linux": "npm run build:server && electron-builder --linux",
+    "build:mac": "npm run build:server && electron-builder --mac"
   },
   "build": {
     "appId": "com.meuplayer.app",
     "productName": "MeuPlayer",
     "files": [
       "main.js",
-      "server.py",
       "public/**/*",
       "!public/cache/**"
     ],
-    "win": { "target": "nsis" },
+    "extraResources": [
+      {
+        "from": "dist-server/meuplayer-server.exe",
+        "to": "."
+      },
+      {
+        "from": "public",
+        "to": "public",
+        "filter": ["**/*", "!cache/**"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "signAndEditExecutable": false
+    },
     "linux": { "target": "AppImage" },
     "mac": { "target": "dmg" }
   },

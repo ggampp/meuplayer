@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MeuPlayer · Rede Buzz</title>
+    <title>MeuPlayer · Buzz Favoritos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,53 +15,50 @@
   </head>
   <body>
     <script src="/nav.js"></script>
-    <main class="workbench" id="rede-buzz">
+    <main class="workbench" id="rede-buzz-favoritos">
       <aside class="workbench__sidebar">
         <header class="workbench__header">
           <p class="workbench__eyebrow">Workbench · TV</p>
           <div class="workbench__header-row">
-            <h1 class="workbench__title">Rede Buzz</h1>
+            <h1 class="workbench__title">Buzz Favoritos</h1>
             <button
               type="button"
               id="toggleFavoriteBtn"
               class="workbench__fav-current"
               hidden
-              aria-pressed="false"
-              title="Adicionar aos favoritos"
+              aria-pressed="true"
+              title="Remover dos favoritos"
             >
-              ☆
+              ★
             </button>
           </div>
         </header>
-        <p class="workbench__status" id="channelsStatus">Carregando canais...</p>
-        <div class="workbench__filters">
+        <p class="workbench__status" id="channelsStatus">Carregando favoritos...</p>
+        <div class="workbench__filters workbench__filters--favorites-only">
           <label class="workbench__field">
             Buscar
             <input
               type="search"
               id="channelSearch"
-              placeholder="Nome do canal..."
+              placeholder="Buscar nos favoritos..."
               autocomplete="off"
             />
           </label>
-          <label class="workbench__field">
-            Categoria
-            <select id="channelCategory">
-              <option value="">Todas</option>
-            </select>
-          </label>
+          <select id="channelCategory" hidden aria-hidden="true">
+            <option value=""></option>
+          </select>
         </div>
         <div
           class="workbench__list"
           id="channelsGrid"
           role="listbox"
-          aria-label="Lista de canais Rede Buzz"
+          aria-label="Canais favoritos da Rede Buzz"
         ></div>
       </aside>
       <section class="workbench__player" aria-label="Player do canal">
         <iframe
           id="player"
-          title="Player Rede Buzz"
+          title="Player Buzz Favoritos"
           allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *"
           allowfullscreen
           webkitallowfullscreen
@@ -77,7 +74,7 @@
     <script src="/rede-buzz-store.js"></script>
     <script src="/rede-buzz-ui.js"></script>
     <script>
-      MeuPlayerRedeBuzzUI.init({ mode: "all" });
+      MeuPlayerRedeBuzzUI.init({ mode: "favorites" });
     </script>
   </body>
 </html>
