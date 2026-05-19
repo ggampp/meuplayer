@@ -1,0 +1,72 @@
+/* Hallmark · MeuPlayer tokens · genre: atmospheric · theme: Bloom (locked)
+ * Source of truth: ../design.md
+ * Diversification axes: dark / italic-serif / warm-amber
+ * Do not edit values here without amending design.md first.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --color-paper:       oklch(16% 0.02 250);
+  --color-paper-2:     oklch(20% 0.02 250);
+  --color-paper-3:     oklch(25% 0.02 250);
+  --color-paper-veil:  oklch(16% 0.02 250 / 0.88);
+  --color-ink:         oklch(96% 0.01 80);
+  --color-ink-2:       oklch(72% 0.02 80);
+  --color-ink-3:       oklch(54% 0.02 80);
+  --color-rule:        oklch(28% 0.015 250);
+  --color-rule-2:      oklch(36% 0.02 250);
+  --color-accent:      oklch(78% 0.15 65);
+  --color-accent-2:    oklch(72% 0.18 50);
+  --color-accent-ink:  oklch(18% 0.02 60);
+  --color-accent-soft: oklch(78% 0.15 65 / 0.14);
+  --color-focus:       oklch(80% 0.18 60);
+  --color-bloom-1:     oklch(78% 0.15 65 / 0.22);
+  --color-bloom-2:     oklch(58% 0.12 285 / 0.16);
+  --color-overlay:     oklch(10% 0.01 250 / 0.78);
+  --color-paper-hover: oklch(20% 0.02 250 / 0.55);
+
+  --font-display: "Fraunces", "Times New Roman", Georgia, serif;
+  --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs:  0.75rem;
+  --space-sm:  1rem;
+  --space-md:  1.5rem;
+  --space-lg:  2rem;
+  --space-xl:  3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 7rem;
+
+  --text-xs:      0.75rem;
+  --text-sm:      0.875rem;
+  --text-md:      1.125rem;
+  --text-lg:      1.375rem;
+  --text-xl:      1.75rem;
+  --text-2xl:     2.25rem;
+  --text-3xl:     2.75rem;
+  --text-display: clamp(2.4rem, 6vw + 1rem, 5.5rem);
+  --text-display-s: clamp(1.8rem, 4vw + 0.6rem, 3.4rem);
+
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-short: 220ms;
+  --dur-med:   320ms;
+
+  --radius-card:  14px;
+  --radius-pill:  999px;
+  --radius-input: 10px;
+  --radius-figure: 18px;
+
+  --rule-thin: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-short: 0ms;
+    --dur-med:   0ms;
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "scanned_at": "2026-05-19",
+  "framework": "vanilla HTML + React 18 via UMD + Babel standalone (no build step)",
+  "font_stack_before": "Inter via system-ui fallback (no @fontsource, no next/font)",
+  "font_stack_after": "Fraunces (display, italic, opsz 144) + Inter (body) + JetBrains Mono (metadata), loaded via Google Fonts <link>",
+  "palette_before": "hex / rgb hard-coded in :root (Netflix-style dark + #e50914 accent)",
+  "palette_after": "OKLCH tokens in /tokens.css, sourced from design.md",
+  "motion_stance": "motion-cut (no framer-motion / gsap / lottie in package.json) — CSS transitions only via tokens",
+  "spacing_before": "ad-hoc px/rem (no scale)",
+  "spacing_after": "4-pt rem-based scale (--space-3xs through --space-3xl) in /tokens.css",
+  "project_pages": [
+    { "file": "public/index.html",     "family": "browse" },
+    { "file": "public/filme.html",     "family": "browse" },
+    { "file": "public/serie.html",     "family": "browse" },
+    { "file": "public/anime.html",     "family": "browse" },
+    { "file": "public/canais.html",    "family": "app-utility" },
+    { "file": "public/rede-buzz.html", "family": "app-utility" }
+  ],
+  "design_system_file": "design.md (project root, written 2026-05-19)",
+  "notes": "Electron app served by Python server.py on port 8765. Static files live in /public. Detail pages are rendered inside app.jsx by route (window.MEUPLAYER_ROUTE) — no separate detail HTML shells."
+}
