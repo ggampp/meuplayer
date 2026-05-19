@@ -54,6 +54,16 @@ function createWindow() {
     `).catch(() => {});
   });
   mainWindow.webContents.on('console-message', (_event, _level, message) => {
+    const currentUrl = mainWindow.webContents.getURL();
+    let pathname = '';
+    try {
+      pathname = new URL(currentUrl).pathname;
+    } catch {
+      return;
+    }
+    const isCanaisPage = pathname === '/canais' || pathname === '/canais/';
+    if (!isCanaisPage) return;
+
     if (message === 'MEUPLAYER_CHANNEL_SELECTED') {
       scheduleChannelPlayerClicks();
       return;
@@ -73,7 +83,8 @@ function createWindow() {
     } catch {
       return;
     }
-    if (pathname !== '/canais' && pathname !== '/canais/') return;
+    const channelRoutes = ['/canais', '/canais/', '/rede-buzz', '/rede-buzz/'];
+    if (!channelRoutes.includes(pathname)) return;
 
     event.preventDefault();
     const direction = input.key === 'ArrowUp' ? -1 : 1;

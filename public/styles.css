@@ -258,8 +258,10 @@ select {
 
 .row__grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 16px;
+  /* Máx. ~300px por card (como o CodePen) — evita 1fr que espreme os posters */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 300px));
+  gap: 24px;
+  justify-content: start;
 }
 
 .row__more {
@@ -274,58 +276,136 @@ select {
   width: fit-content;
 }
 
+/* Clip-path card hover — public/exemplo/card.css (CodePen XvdEoO) */
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--outline);
-  border-radius: 16px;
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 2 / 3;
+  height: auto;
   padding: 0;
-  min-height: 220px;
-  display: grid;
-  grid-template-rows: auto 1fr;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-card);
+  box-shadow: 0 4px 7px rgba(0, 0, 0, 0.5);
   cursor: pointer;
-  transition: transform 0.2s ease, border 0.2s ease;
   overflow: hidden;
+  text-align: left;
+  color: var(--text);
+  transition: all 0.5s cubic-bezier(0.8, 0.5, 0.2, 1.4);
+}
+
+.card--compact {
+  max-width: 240px;
 }
 
 .card:hover {
-  transform: translateY(-4px);
+  transform: scale(0.97);
   border-color: rgba(229, 9, 20, 0.45);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.35);
 }
 
-.card__poster {
-  height: 180px;
+.card__media {
+  position: absolute;
+  inset: 0;
   background: linear-gradient(135deg, #1f1f33, #10101b);
-  background-size: cover;
-  background-position: center;
-  display: grid;
-  place-items: center;
+}
+
+.card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transition: all 0.5s cubic-bezier(0.8, 0.5, 0.2, 1.4);
+}
+
+.card:hover .card__media img {
+  transform: scale(1.6) rotate(20deg);
+  filter: blur(3px);
 }
 
 .card__placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   color: var(--muted);
   font-size: 0.85rem;
 }
 
-.card__body {
-  padding: 12px 14px 14px;
-  display: grid;
-  gap: 8px;
+.card__descriptions {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: rgba(11, 11, 18, 0.88);
+  clip-path: circle(0% at 100% 100%);
+  transition: clip-path 0.7s ease-in-out;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.card:hover .card__descriptions,
+.card:focus-visible .card__descriptions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.card:hover .card__descriptions {
+  clip-path: circle(75%);
 }
 
 .card__title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.card__subtitle {
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.card__action {
-  font-size: 0.85rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
   color: var(--accent);
+}
+
+.card__meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.card__overview {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+}
+
+.card--compact .card__overview {
+  -webkit-line-clamp: 4;
+}
+
+.card__cta {
+  display: inline-block;
+  width: fit-content;
+  margin-top: auto;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.5s ease-in-out;
+}
+
+.card:hover .card__cta {
+  transform: translateX(-4px) scale(0.97);
 }
 
 .calendar {
@@ -494,8 +574,9 @@ select {
 
 .detail__related-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 260px));
+  gap: 20px;
+  justify-content: start;
 }
 
 .calendar__grid {
@@ -660,7 +741,16 @@ select {
   }
 
   .row__grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 220px));
+    gap: 16px;
+  }
+
+  .card {
+    max-width: 220px;
+  }
+
+  .card--compact {
+    max-width: 180px;
   }
 
   .detail {

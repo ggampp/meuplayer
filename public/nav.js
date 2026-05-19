@@ -4,6 +4,7 @@
     { label: 'Séries', path: '/serie' },
     { label: 'Animes', path: '/anime' },
     { label: 'Canais', path: '/canais' },
+    { label: 'Rede Buzz', path: '/rede-buzz' },
   ];
 
   const style = document.createElement('style');
