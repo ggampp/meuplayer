@@ -2,9 +2,9 @@ const { useEffect, useMemo, useState } = React;
 
 const API_BASE = "";
 const categories = [
-  { key: "movie", label: "Filmes" },
-  { key: "serie", label: "Séries" },
-  { key: "anime", label: "Animes" },
+  { key: "movie", label: "Filmes", eyebrow: "Cinema" },
+  { key: "serie", label: "Séries", eyebrow: "Live action" },
+  { key: "anime", label: "Animes", eyebrow: "Animação" },
 ];
 
 const LANGUAGE_OPTIONS = [
@@ -175,6 +175,16 @@ function isReleased(meta) {
   return parsed <= Date.now();
 }
 
+function pickYear(meta) {
+  return (meta?.release_date || meta?.first_air_date || "").slice(0, 4);
+}
+
+function typeLabel(type) {
+  if (type === "movie") return "Filme";
+  if (type === "anime") return "Anime";
+  return "Série";
+}
+
 function MediaCard({ item, meta, onSelect, compact = false }) {
   const displayTitle =
     meta?.title ||
@@ -184,15 +194,17 @@ function MediaCard({ item, meta, onSelect, compact = false }) {
     item.id;
   const originalTitle =
     meta?.original_title || meta?.original_name || displayTitle;
-  const year = (meta?.release_date || meta?.first_air_date || "").slice(0, 4);
+  const year = pickYear(meta);
   const posterPath = meta?.poster_path ? `${IMAGE_BASE}${meta.poster_path}` : "";
   const overview = meta?.overview || "Sinopse não disponível.";
+  const sameTitle = originalTitle === displayTitle;
 
   return (
     <button
       type="button"
       className={`card${compact ? " card--compact" : ""}`}
       onClick={() => onSelect(item)}
+      aria-label={`Abrir ${displayTitle}`}
     >
       <div className="card__media">
         {posterPath ? (
@@ -201,29 +213,31 @@ function MediaCard({ item, meta, onSelect, compact = false }) {
           <span className="card__placeholder">Sem capa</span>
         )}
       </div>
-      <div className="card__descriptions">
+      <div className="card__veil">
         <h3 className="card__title">{displayTitle}</h3>
+        <span className="card__meta">
+          {typeLabel(item.type)}
+          {year ? ` · ${year}` : ""}
+          {!sameTitle ? ` · ${originalTitle}` : ""}
+        </span>
         {!compact ? (
-          <>
-            <p className="card__meta">
-              {originalTitle}
-              {year ? ` · ${year}` : ""}
-            </p>
-            <p className="card__overview">{overview}</p>
-            <span className="card__cta">Assistir agora</span>
-          </>
-        ) : (
-          <span className="card__cta">Ver detalhes</span>
-        )}
+          <p className="card__overview">{overview}</p>
+        ) : null}
+        <span className="card__cta">Abrir →</span>
       </div>
     </button>
   );
 }
 
-function GridRow({ title, items, onSelect, hasMore, onMore }) {
+function GridRow({ title, eyebrow, status, items, onSelect, hasMore, onMore }) {
   return (
-    <div className="row">
-      <div className="row__title">{title}</div>
+    <section className="row" aria-labelledby={`row-${title}`}>
+      <header className="row__header">
+        <h2 className="row__title" id={`row-${title}`}>
+          {title}
+        </h2>
+        <span className="row__status">{eyebrow}</span>
+      </header>
       <div className="row__grid">
         {items.length ? (
           items.map((item) => (
@@ -235,15 +249,72 @@ function GridRow({ title, items, onSelect, hasMore, onMore }) {
             />
           ))
         ) : (
-          <div className="rows__status">Nenhum item encontrado.</div>
+          <div className="row__empty">{status || "Nenhum item encontrado."}</div>
         )}
       </div>
       {hasMore ? (
-        <button className="row__more" onClick={onMore}>
-          Mais
+        <button type="button" className="row__more" onClick={onMore}>
+          Mais {title.toLowerCase()}
         </button>
       ) : null}
-    </div>
+    </section>
+  );
+}
+
+function Hero({ featured, status, onWatch }) {
+  if (!featured) {
+    return (
+      <section className="hero" aria-label="Destaque">
+        <div className="hero__bloom" aria-hidden="true" />
+        <p className="hero__eyebrow">MeuPlayer</p>
+        <h1 className="hero__title">
+          Um cinema <em>pessoal</em>, sem alarde.
+        </h1>
+        <p className="hero__subtitle">
+          Filmes, séries e animes do TMDB tocados via SuperFlix — sem
+          recomendações forçadas, sem perfis, sem anúncios.
+        </p>
+        <p className="hero__meta">{status || "Carregando catálogo..."}</p>
+      </section>
+    );
+  }
+
+  const meta = featured.meta || {};
+  const title = meta.title || meta.name || featured.id;
+  const year = pickYear(meta);
+  const overview = meta.overview || "";
+  const backdropPath = meta.backdrop_path
+    ? `${BACKDROP_BASE}${meta.backdrop_path}`
+    : "";
+  const backdropStyle = backdropPath
+    ? { backgroundImage: `url(${backdropPath})` }
+    : undefined;
+
+  return (
+    <section className="hero" aria-label="Destaque do catálogo">
+      <div className="hero__backdrop" style={backdropStyle} aria-hidden="true" />
+      <div className="hero__bloom" aria-hidden="true" />
+      <p className="hero__eyebrow">
+        {typeLabel(featured.type)}
+        {year ? ` · ${year}` : ""}
+      </p>
+      <h1 className="hero__title">{title}</h1>
+      {overview ? (
+        <p className="hero__subtitle">
+          {overview.length > 220 ? overview.slice(0, 220) + "…" : overview}
+        </p>
+      ) : null}
+      <div className="hero__actions">
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => onWatch(featured)}
+        >
+          Abrir detalhes
+        </button>
+        <span className="hero__meta">{status}</span>
+      </div>
+    </section>
   );
 }
 
@@ -641,6 +712,7 @@ function App() {
       return {
         key: category.key,
         title: category.label,
+        eyebrow: category.eyebrow,
         items,
         hasMore: total > limit,
       };
@@ -656,6 +728,14 @@ function App() {
     languageResults,
     displayCounts,
   ]);
+
+  const featured = useMemo(() => {
+    for (const row of filteredRows) {
+      const candidate = row.items.find((item) => item.meta?.backdrop_path);
+      if (candidate) return candidate;
+    }
+    return null;
+  }, [filteredRows]);
 
   const genreOptions = useMemo(() => {
     if (typeFilter === "movie") {
@@ -725,6 +805,9 @@ function App() {
     setSelected(item);
     ensureMeta(item);
     syncUrl(item);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
   };
 
   const closeDetail = () => {
@@ -822,18 +905,16 @@ function App() {
     if (loadingCatalog) return "Carregando catálogo...";
     if (searchResults) {
       return langLabel
-        ? `Resultados da pesquisa · idioma ${langLabel}`
-        : "Resultados da pesquisa";
+        ? `Resultados da busca · ${langLabel}`
+        : "Resultados da busca";
     }
     if (genreResults) {
       return langLabel
-        ? `Catálogo por gênero · idioma ${langLabel}`
-        : "Catálogo por gênero";
+        ? `Filtro por gênero · ${langLabel}`
+        : "Filtro por gênero";
     }
     if (languageResults) {
-      return langLabel
-        ? `Catálogo por idioma · ${langLabel}`
-        : "Catálogo por idioma";
+      return langLabel ? `Filtro por idioma · ${langLabel}` : "Filtro por idioma";
     }
     return status;
   }, [
@@ -853,96 +934,126 @@ function App() {
     }));
   };
 
-  return (
-    <>
-      <main>
-        {selected ? (
-          <section className="detail">
+  const browseEyebrow = useMemo(() => {
+    if (ROUTE_TYPE === "movie") return "Catálogo · Filmes";
+    if (ROUTE_TYPE === "serie") return "Catálogo · Séries";
+    if (ROUTE_TYPE === "anime") return "Catálogo · Animes";
+    return "Catálogo · Tudo";
+  }, []);
+
+  const browseTitle = useMemo(() => {
+    if (ROUTE_TYPE === "movie") return "Filmes";
+    if (ROUTE_TYPE === "serie") return "Séries";
+    if (ROUTE_TYPE === "anime") return "Animes";
+    return "Tudo o que está no MeuPlayer";
+  }, []);
+
+  if (selected) {
+    const title = selectedMeta?.title || selectedMeta?.name || selected.id;
+    const subtitle =
+      selectedMeta?.original_title ||
+      selectedMeta?.original_name ||
+      "Título original não informado";
+    const year = pickYear(selectedMeta);
+    const rating = selectedMeta?.vote_average?.toFixed?.(1) || "—";
+    const runtime =
+      selectedMeta?.runtime ||
+      selectedMeta?.episode_run_time?.[0] ||
+      null;
+    const backdropPath = selectedMeta?.backdrop_path
+      ? `${BACKDROP_BASE}${selectedMeta.backdrop_path}`
+      : "";
+    const posterPath = selectedMeta?.poster_path
+      ? `${IMAGE_BASE}${selectedMeta.poster_path}`
+      : "";
+
+    return (
+      <>
+        <main>
+          <article className="detail">
             <div
               className="detail__backdrop"
-              style={{
-                backgroundImage: selectedMeta?.backdrop_path
-                  ? `url(${BACKDROP_BASE}${selectedMeta.backdrop_path})`
-                  : undefined,
-              }}
-            ></div>
+              style={backdropPath ? { backgroundImage: `url(${backdropPath})` } : undefined}
+              aria-hidden="true"
+            />
             <div className="detail__content">
-              <button className="detail__back" onClick={closeDetail}>
+              <button type="button" className="detail__back" onClick={closeDetail}>
                 ← Voltar ao catálogo
               </button>
+
               <div className="detail__layout">
                 <div
                   className="detail__poster"
-                  style={{
-                    backgroundImage: selectedMeta?.poster_path
-                      ? `url(${IMAGE_BASE}${selectedMeta.poster_path})`
-                      : undefined,
-                  }}
+                  style={posterPath ? { backgroundImage: `url(${posterPath})` } : undefined}
                 >
-                  {!selectedMeta?.poster_path ? (
-                    <span className="card__placeholder">Sem capa</span>
-                  ) : null}
+                  {!posterPath ? <span className="card__placeholder">Sem capa</span> : null}
                 </div>
+
                 <div className="detail__info">
-                  <h1 className="detail__title">
-                    {selectedMeta?.title ||
-                      selectedMeta?.name ||
-                      selected.id}
-                  </h1>
-                  <p className="detail__subtitle">
-                    {selectedMeta?.original_title ||
-                      selectedMeta?.original_name ||
-                      "Título original não informado"}
-                    {(selectedMeta?.release_date ||
-                      selectedMeta?.first_air_date) &&
-                      ` · ${(
-                        selectedMeta.release_date ||
-                        selectedMeta.first_air_date
-                      ).slice(0, 4)}`}
+                  <p className="detail__eyebrow">
+                    {typeLabel(selected.type)}
+                    {year ? ` · ${year}` : ""}
                   </p>
+                  <h1 className="detail__title">{title}</h1>
+                  <p className="detail__subtitle">{subtitle}</p>
+
                   <div className="detail__meta">
                     <span>
-                      Nota: {selectedMeta?.vote_average?.toFixed?.(1) || "N/A"}
+                      Nota <strong>{rating}</strong>
                     </span>
-                    <span>
-                      Duração:{" "}
-                      {selectedMeta?.runtime ||
-                        selectedMeta?.episode_run_time?.[0] ||
-                        "N/D"}{" "}
-                      min
-                    </span>
+                    {runtime ? (
+                      <span>
+                        Duração <strong>{runtime} min</strong>
+                      </span>
+                    ) : null}
+                    {selectedMeta?.number_of_seasons ? (
+                      <span>
+                        Temporadas <strong>{selectedMeta.number_of_seasons}</strong>
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="detail__genres">
-                    {(selectedMeta?.genres || []).length
-                      ? selectedMeta.genres.map((genre) => (
-                          <span key={genre.id}>{genre.name}</span>
-                        ))
-                      : "Gêneros não informados"}
-                  </div>
+
+                  {(selectedMeta?.genres || []).length ? (
+                    <div className="detail__genres">
+                      {selectedMeta.genres.map((genre) => (
+                        <span key={genre.id}>{genre.name}</span>
+                      ))}
+                    </div>
+                  ) : null}
+
                   <p className="detail__overview">
                     {selectedMeta?.overview || "Sinopse não informada."}
                   </p>
+
                   <div className="detail__actions">
                     <button
+                      type="button"
                       className="btn btn--primary"
                       onClick={() => openModal(selected)}
                     >
                       Assistir
                     </button>
-                    <button className="btn btn--ghost" onClick={closeDetail}>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={closeDetail}
+                    >
                       Voltar
                     </button>
                   </div>
                 </div>
               </div>
+
               {selected.type !== "movie" ? (
-                <div className="detail__episodes">
-                  <div className="detail__episodes-header">
-                    <h2>Temporadas</h2>
+                <section className="detail__section">
+                  <div className="detail__section-heading">
+                    <h2 className="detail__section-title">Temporadas</h2>
                     {seasonList.length > 1 ? (
                       <select
+                        className="detail__season-select"
                         value={seasonNumber}
                         onChange={(event) => setSeasonNumber(event.target.value)}
+                        aria-label="Selecionar temporada"
                       >
                         {seasonList.map((season) => (
                           <option
@@ -959,56 +1070,60 @@ function App() {
                       </span>
                     )}
                   </div>
-                  <div className="detail__episodes-grid">
+
+                  <ol className="episodes">
                     {(seasonData?.episodes || []).map((episode) => (
-                      <button
-                        key={episode.id}
-                        className="episode-card"
-                        onClick={() =>
-                          openModal(
-                            { id: selected.id, type: selected.type },
-                            String(episode.season_number || seasonNumber),
-                            String(episode.episode_number)
-                          )
-                        }
-                      >
-                        <div
-                          className="episode-card__image"
-                          style={{
-                            backgroundImage: episode.still_path
-                              ? `url(${STILL_BASE}${episode.still_path})`
-                              : undefined,
-                          }}
+                      <li key={episode.id}>
+                        <button
+                          type="button"
+                          className="episode"
+                          onClick={() =>
+                            openModal(
+                              { id: selected.id, type: selected.type },
+                              String(episode.season_number || seasonNumber),
+                              String(episode.episode_number)
+                            )
+                          }
                         >
-                          {!episode.still_path ? (
-                            <span className="card__placeholder">Sem imagem</span>
-                          ) : null}
-                          <span className="episode-card__runtime">
-                            {episode.runtime || episode.vote_average
-                              ? `${episode.runtime || "?"} min`
-                              : ""}
+                          <div
+                            className="episode__image"
+                            style={
+                              episode.still_path
+                                ? { backgroundImage: `url(${STILL_BASE}${episode.still_path})` }
+                                : undefined
+                            }
+                          >
+                            {!episode.still_path ? (
+                              <span className="card__placeholder">Sem still</span>
+                            ) : null}
+                            {episode.runtime ? (
+                              <span className="episode__runtime">{episode.runtime} min</span>
+                            ) : null}
+                          </div>
+                          <div className="episode__body">
+                            <span className="episode__number">
+                              T{episode.season_number} · E{episode.episode_number}
+                            </span>
+                            <span className="episode__title">{episode.name}</span>
+                            <p className="episode__overview">
+                              {episode.overview || "Sem sinopse."}
+                            </p>
+                          </div>
+                          <span className="episode__chevron" aria-hidden="true">
+                            →
                           </span>
-                        </div>
-                        <div className="episode-card__body">
-                          <strong>
-                            T{episode.season_number}:E{episode.episode_number}{" "}
-                            {episode.name}
-                          </strong>
-                          <p>
-                            {episode.overview
-                              ? episode.overview.slice(0, 140) +
-                                (episode.overview.length > 140 ? "..." : "")
-                              : "Sem sinopse."}
-                          </p>
-                        </div>
-                      </button>
+                        </button>
+                      </li>
                     ))}
-                  </div>
-                </div>
+                  </ol>
+                </section>
               ) : null}
+
               {relatedItems.length ? (
-                <div className="detail__related">
-                  <h2>Itens relacionados</h2>
+                <section className="detail__section">
+                  <div className="detail__section-heading">
+                    <h2 className="detail__section-title">Itens relacionados</h2>
+                  </div>
                   <div className="detail__related-grid">
                     {relatedItems.map((item) => (
                       <MediaCard
@@ -1020,33 +1135,152 @@ function App() {
                       />
                     ))}
                   </div>
-                </div>
+                </section>
               ) : null}
             </div>
-          </section>
-        ) : (
-        <>
-        <header className="catalog-header">
-          <section className="filters">
-            <label>
+          </article>
+        </main>
+
+        {renderModal()}
+      </>
+    );
+  }
+
+  function renderModal() {
+    return (
+      <div
+        className={`modal ${modal.open ? "is-open" : ""}`}
+        aria-hidden={!modal.open}
+      >
+        <div className="modal__overlay" onClick={closeModal}></div>
+        <div className="modal__content" role="dialog" aria-label="Player de mídia">
+          <div className="modal__header">
+            <div>
+              <h3 className="modal__title">
+                Player · {typeLabel(modal.type === "movie" ? "movie" : "serie")}
+              </h3>
+              <p className="modal__meta">
+                {playerUrl ? playerUrl : "Informe um ID válido."}
+              </p>
+            </div>
+            <button type="button" className="modal__close" onClick={closeModal}>
+              ×
+            </button>
+          </div>
+          <div className="modal__controls">
+            <div className="control">
+              <label htmlFor="modalProvider">Player</label>
+              <select
+                id="modalProvider"
+                value={playerProvider}
+                onChange={(event) => setPlayerProvider(event.target.value)}
+              >
+                <option value="superflix">SuperFlix</option>
+                <option value="vidsrc">Vidsrc</option>
+              </select>
+            </div>
+            <div className="control">
+              <label htmlFor="modalType">Tipo</label>
+              <select
+                id="modalType"
+                value={modal.type}
+                onChange={(event) =>
+                  setModal({ ...modal, type: event.target.value })
+                }
+              >
+                <option value="movie">Filme</option>
+                <option value="serie">Série/Anime</option>
+              </select>
+            </div>
+            <div className="control">
+              <label htmlFor="modalId">ID</label>
+              <input
+                id="modalId"
+                value={modal.id}
+                onChange={(event) =>
+                  setModal({ ...modal, id: event.target.value })
+                }
+              />
+            </div>
+            <div className="control">
+              <label htmlFor="modalSeason">Temporada</label>
+              <input
+                id="modalSeason"
+                type="number"
+                min="1"
+                value={modalSeason}
+                onChange={(event) => setModalSeason(event.target.value)}
+                disabled={modal.type === "movie"}
+              />
+            </div>
+            <div className="control">
+              <label htmlFor="modalEpisode">Episódio</label>
+              <input
+                id="modalEpisode"
+                type="number"
+                min="1"
+                value={modalEpisode}
+                onChange={(event) => setModalEpisode(event.target.value)}
+                disabled={modal.type === "movie"}
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => setModal({ ...modal })}
+            >
+              Atualizar
+            </button>
+          </div>
+          <div className="modal__player">
+            {modal.open ? (
+              <iframe
+                id="playerFrame"
+                title="Player de mídia"
+                src={playerUrl}
+                allowFullScreen
+              ></iframe>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <main>
+        <Hero featured={featured} status={rowsLabel} onWatch={openDetail} />
+
+        <section className="catalog-header" aria-label="Filtros do catálogo">
+          <header className="catalog-header__heading">
+            <p className="catalog-header__eyebrow">{browseEyebrow}</p>
+            <h2 className="catalog-header__title">{browseTitle}</h2>
+          </header>
+          <div className="filters">
+            <label className="filters__field">
               Tipo
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                disabled={Boolean(ROUTE_TYPE)}
+              >
                 <option value="all">Todos</option>
                 <option value="movie">Filmes</option>
                 <option value="serie">Séries</option>
                 <option value="anime">Animes</option>
               </select>
             </label>
-            <label>
+            <label className="filters__field">
               Busca
               <input
                 type="search"
-                placeholder="Buscar por nome ou ID"
+                placeholder="Título, ID, original"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </label>
-            <label>
+            <label className="filters__field">
               Gênero
               <select
                 value={genreFilter}
@@ -1060,7 +1294,7 @@ function App() {
                 ))}
               </select>
             </label>
-            <label>
+            <label className="filters__field">
               Idioma original
               <select
                 value={languageFilter}
@@ -1073,27 +1307,17 @@ function App() {
                 ))}
               </select>
             </label>
-            <label>
-              Limite por lista
-              <input
-                type="text"
-                value="10 itens (use Mais)"
-                readOnly
-              />
-            </label>
-          </section>
-        </header>
-
-        <section id="rows" className="rows">
-          <div className="rows__header">
-            <h2>Catálogo</h2>
-            <span className="rows__status">{rowsLabel}</span>
           </div>
+        </section>
+
+        <section className="rows" id="rows">
           <div className="rows__container">
             {filteredRows.map((row) => (
               <GridRow
                 key={row.key}
                 title={row.title}
+                eyebrow={row.eyebrow}
+                status={rowsLabel}
                 items={row.items}
                 onSelect={openDetail}
                 hasMore={row.hasMore}
@@ -1102,93 +1326,9 @@ function App() {
             ))}
           </div>
         </section>
-
-        </>
-        )}
       </main>
 
-      <div className={`modal ${modal.open ? "is-open" : ""}`} aria-hidden={!modal.open}>
-        <div className="modal__overlay" onClick={closeModal}></div>
-        <div className="modal__content">
-          <div className="modal__header">
-            <div>
-              <h3>Player {modal.type}</h3>
-              <p className="modal__meta">
-                {playerUrl ? `URL: ${playerUrl}` : "Informe um ID válido."}
-              </p>
-            </div>
-            <button className="modal__close" onClick={closeModal}>
-              &times;
-            </button>
-          </div>
-          <div className="modal__controls">
-            <div className="control">
-              <label>Player</label>
-              <select
-                value={playerProvider}
-                onChange={(event) => setPlayerProvider(event.target.value)}
-              >
-                <option value="superflix">SuperFlix</option>
-                <option value="vidsrc">Vidsrc</option>
-              </select>
-            </div>
-            <div className="control">
-              <label>Tipo</label>
-              <select
-                value={modal.type}
-                onChange={(event) =>
-                  setModal({ ...modal, type: event.target.value })
-                }
-              >
-                <option value="movie">Filme</option>
-                <option value="serie">Série/Anime</option>
-              </select>
-            </div>
-            <div className="control">
-              <label>ID</label>
-              <input
-                value={modal.id}
-                onChange={(event) =>
-                  setModal({ ...modal, id: event.target.value })
-                }
-              />
-            </div>
-            <div className="control">
-              <label>Temporada</label>
-              <input
-                type="number"
-                min="1"
-                value={modalSeason}
-                onChange={(event) => setModalSeason(event.target.value)}
-                disabled={modal.type === "movie"}
-              />
-            </div>
-            <div className="control">
-              <label>Episódio</label>
-              <input
-                type="number"
-                min="1"
-                value={modalEpisode}
-                onChange={(event) => setModalEpisode(event.target.value)}
-                disabled={modal.type === "movie"}
-              />
-            </div>
-            <button className="btn btn--primary" onClick={() => setModal({ ...modal })}>
-              Atualizar
-            </button>
-          </div>
-          <div className="modal__player">
-            {modal.open ? (
-              <iframe
-                id="playerFrame"
-                title="SuperFlix Player"
-                src={playerUrl}
-                allowFullScreen
-              ></iframe>
-            ) : null}
-          </div>
-        </div>
-      </div>
+      {renderModal()}
     </>
   );
 }

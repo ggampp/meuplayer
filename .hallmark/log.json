@@ -1,0 +1,33 @@
+[
+  {
+    "date": "2026-05-19",
+    "scope": "app",
+    "verb": "redesign",
+    "designed_as_app": true,
+    "design_system": "design.md",
+    "genre": "atmospheric",
+    "theme": "Bloom",
+    "theme_axes": "dark / italic-serif / warm-amber",
+    "macrostructures": {
+      "browse": "Marquee Hero",
+      "detail": "Long Document",
+      "app_utility": "Workbench"
+    },
+    "components": {
+      "hero": "H7 Stage",
+      "card": "veil-fade (custom)",
+      "footer": "none (app, no marketing footer)",
+      "nav": "N3 minimal sticky"
+    },
+    "enrichment": "Tier-A radial bloom (browse hero only)",
+    "pages": [
+      "public/index.html",
+      "public/filme.html",
+      "public/serie.html",
+      "public/anime.html",
+      "public/canais.html",
+      "public/rede-buzz.html"
+    ],
+    "brief": "MeuPlayer · personal media catalog Electron app · multi-page redesign from Netflix-style dark theme to atmospheric Bloom"
+  }
+]
