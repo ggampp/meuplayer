@@ -4,7 +4,6 @@
     { label: 'Séries', path: '/serie' },
     { label: 'Animes', path: '/anime' },
     { label: 'Canais', path: '/canais' },
-    { label: 'PirataTV', path: '/pirataTv' },
   ];
 
   const style = document.createElement('style');

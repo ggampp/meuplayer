@@ -7,84 +7,257 @@
     <link rel="stylesheet" href="/styles.css" />
     <style>
       .channels-page {
-        padding: 32px 48px;
         display: grid;
-        gap: 18px;
+        grid-template-columns: 260px minmax(0, 1fr);
+        height: calc(100vh - 52px);
+        min-height: 560px;
+        overflow: hidden;
+      }
+
+      .channels-sidebar {
+        border-right: 1px solid var(--outline);
+        background: var(--bg-soft);
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .channels-header {
+        padding: 24px 18px 10px;
       }
 
       .channels-page h1 {
         font-size: 1.6rem;
-      }
-
-      .channels-page .channels-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        gap: 12px;
-      }
-
-      .channels-page .channel-card {
-        border: 1px solid var(--outline);
-        border-radius: 12px;
-        background: var(--bg-card);
-        color: var(--text);
-        padding: 14px 12px;
-        text-align: center;
-        cursor: pointer;
-      }
-
-      .channels-page .channel-card:hover {
-        border-color: rgba(229, 9, 20, 0.45);
+        margin: 0;
       }
 
       .channels-page .status {
         color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.4;
+        padding: 0 18px 14px;
+      }
+
+      .channels-page .channels-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        padding: 0 8px 16px;
+      }
+
+      .channels-page .channels-grid::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .channels-page .channels-grid::-webkit-scrollbar-thumb {
+        background: var(--outline);
+        border-radius: 2px;
+      }
+
+      .channels-page .channel-card {
+        border: 0;
+        border-left: 3px solid transparent;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        padding: 10px 12px;
+        text-align: left;
+        cursor: pointer;
         font-size: 0.9rem;
+        min-height: 38px;
+      }
+
+      .channels-page .channel-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        border-left-color: rgba(229, 9, 20, 0.35);
+      }
+
+      .channels-page .channel-card.active {
+        background: rgba(229, 9, 20, 0.1);
+        color: var(--text);
+        border-left-color: var(--accent);
+      }
+
+      .channels-player {
+        min-width: 0;
+        min-height: 0;
+        background: #000;
+        position: relative;
       }
 
       .channels-page iframe {
         border: 0;
         width: 100%;
-        max-width: 980px;
-        min-height: 560px;
+        height: 100%;
+        min-height: 100%;
         background: #000;
-        border-radius: 12px;
+        display: block;
+      }
+
+      .player-overlay {
+        position: fixed;
+        right: 22px;
+        top: 50%;
+        z-index: 20;
+        display: grid;
+        gap: 8px;
+        transform: translateY(-50%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease;
+      }
+
+      .player-overlay.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .player-overlay button {
+        width: 46px;
+        height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(10, 10, 16, 0.82);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 1.15rem;
+        backdrop-filter: blur(8px);
+      }
+
+      .player-overlay button:hover {
+        border-color: var(--accent);
+        background: rgba(229, 9, 20, 0.24);
+      }
+
+      @media (max-width: 760px) {
+        .channels-page {
+          grid-template-columns: 1fr;
+          grid-template-rows: 230px minmax(0, 1fr);
+        }
+
+        .channels-sidebar {
+          border-right: 0;
+          border-bottom: 1px solid var(--outline);
+        }
+
+        .channels-header {
+          padding-top: 18px;
+        }
       }
     </style>
   </head>
   <body>
     <script src="/nav.js"></script>
     <main class="channels-page" id="canais-ao-vivo">
-      <h1>Canais ao vivo</h1>
-      <p class="status" id="channelsStatus">Carregando canais...</p>
-      <div class="channels-grid" id="channelsGrid"></div>
-      <iframe id="player" title="Player de canais" allowfullscreen></iframe>
+      <aside class="channels-sidebar">
+        <div class="channels-header">
+          <h1>Canais ao vivo</h1>
+        </div>
+        <p class="status" id="channelsStatus">Carregando canais...</p>
+        <div class="channels-grid" id="channelsGrid"></div>
+      </aside>
+      <section class="channels-player">
+        <iframe id="player" title="Player de canais" allowfullscreen></iframe>
+      </section>
+      <div class="player-overlay" id="playerOverlay" aria-label="Controles do canal">
+        <button type="button" id="channelUp" title="Canal anterior">▲</button>
+        <button type="button" id="channelPlay" title="Tentar play">▶</button>
+        <button type="button" id="channelDown" title="Próximo canal">▼</button>
+      </div>
     </main>
 
     <script>
       (function () {
         const grid = document.getElementById("channelsGrid");
         const player = document.getElementById("player");
+        const overlay = document.getElementById("playerOverlay");
+        const channelUp = document.getElementById("channelUp");
+        const channelPlay = document.getElementById("channelPlay");
+        const channelDown = document.getElementById("channelDown");
         const status = document.getElementById("channelsStatus");
+        let channelList = [];
+        let channelButtons = [];
+        let activeIndex = -1;
+        let overlayTimer = null;
+
+        function selectChannel(index) {
+          const channel = channelList[index];
+          const button = channelButtons[index];
+          if (!channel || !button) return;
+
+          channelButtons.forEach((item) => item.classList.remove("active"));
+          button.classList.add("active");
+          button.scrollIntoView({ block: "nearest" });
+          activeIndex = index;
+          player.src = channel.src || "";
+          status.textContent = `Canal atual: ${button.textContent}`;
+          scheduleAutoPlayClick();
+        }
+
+        function scheduleAutoPlayClick() {
+          window.meuPlayerLastPlayerRect = player.getBoundingClientRect().toJSON();
+          window.meuPlayerNeedsPlayClick = true;
+          console.log("MEUPLAYER_CHANNEL_SELECTED");
+          window.dispatchEvent(new CustomEvent("meuplayer:channel-selected"));
+        }
+
+        function requestPlayClick() {
+          console.log("MEUPLAYER_PLAY_REQUESTED");
+        }
 
         function renderChannels(channels) {
+          channelList = channels;
+          channelButtons = [];
           grid.innerHTML = "";
           channels.forEach((channel, index) => {
             const button = document.createElement("button");
             button.type = "button";
             button.className = "channel-card";
             button.textContent = channel.nome || channel.id || "Canal";
-            button.addEventListener("click", () => {
-              player.src = channel.src || "";
-              status.textContent = `Canal atual: ${button.textContent}`;
-            });
+            button.addEventListener("click", () => selectChannel(index));
             grid.appendChild(button);
+            channelButtons.push(button);
 
             if (index === 0 && channel.src) {
-              player.src = channel.src;
-              status.textContent = `Canal atual: ${button.textContent}`;
+              selectChannel(index);
             }
           });
         }
+
+        window.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+          if (!channelList.length) return;
+
+          event.preventDefault();
+          selectAdjacentChannel(event.key === "ArrowUp" ? -1 : 1);
+        });
+
+        function selectAdjacentChannel(direction) {
+          if (!channelList.length) return;
+          const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+          const nextIndex =
+            (currentIndex + direction + channelList.length) % channelList.length;
+          selectChannel(nextIndex);
+        }
+
+        window.meuPlayerSelectAdjacentChannel = selectAdjacentChannel;
+        window.meuPlayerRequestPlayClick = requestPlayClick;
+
+        function showOverlay() {
+          overlay.classList.add("is-visible");
+          if (overlayTimer) clearTimeout(overlayTimer);
+          overlayTimer = setTimeout(() => {
+            overlay.classList.remove("is-visible");
+          }, 2600);
+        }
+
+        window.addEventListener("mousemove", showOverlay);
+        window.addEventListener("keydown", showOverlay);
+        channelUp.addEventListener("click", () => selectAdjacentChannel(-1));
+        channelDown.addEventListener("click", () => selectAdjacentChannel(1));
+        channelPlay.addEventListener("click", requestPlayClick);
 
         fetch("/canais.json")
           .then((response) => {

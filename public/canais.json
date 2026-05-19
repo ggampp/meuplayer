@@ -1,37 +1,53 @@
 [
-  {
-    "id": "discovery",
-    "nome": "Discovery",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=discovery"
-  },
-  {
-    "id": "sportv1",
-    "nome": "SporTV 1",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=sportv1"
-  },
-  {
-    "id": "sportv2",
-    "nome": "SporTV 2",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=sportv2"
-  },
-  {
-    "id": "sportv3",
-    "nome": "SporTV 3",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=sportv3"
-  },
-  {
-    "id": "premiereclubes",
-    "nome": "Premiere Clubes",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=premiereclubes"
-  },
-  {
-    "id": "premiere3",
-    "nome": "Premiere 3",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=premiere3"
-  },
-  {
-    "id": "bobojr",
-    "nome": "Bobo Jr",
-    "src": "https://redecanaistv.fm/player3/ch.php?canal=bobojr"
-  }
+  { "id": "animalplanet", "nome": "Animal Planet", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=animalplanet" },
+  { "id": "axn", "nome": "AXN", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=axn" },
+  { "id": "band", "nome": "Band", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=band" },
+  { "id": "bandnews", "nome": "Band News", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=bandnews" },
+  { "id": "bandsports", "nome": "Band Sports", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=bandsports" },
+  { "id": "cartoon", "nome": "Cartoon Network", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=cartoon" },
+  { "id": "cinecanal", "nome": "Cinecanal", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=cinecanal" },
+  { "id": "cinemax", "nome": "Cinemax", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=cinemax" },
+  { "id": "cnnbrasil", "nome": "CNN Brasil", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=cnnbrasil" },
+  { "id": "combate", "nome": "Combate", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=combate" },
+  { "id": "comedycentral", "nome": "Comedy Central", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=comedycentral" },
+  { "id": "discovery", "nome": "Discovery Channel", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=discovery" },
+  { "id": "discoverykids", "nome": "Discovery Kids", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=discoverykids" },
+  { "id": "discoveryturbo", "nome": "Discovery Turbo", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=discoveryturbo" },
+  { "id": "espn", "nome": "ESPN", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=espn" },
+  { "id": "espn2", "nome": "ESPN 2", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=espn2" },
+  { "id": "espn3", "nome": "ESPN 3", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=espn3" },
+  { "id": "espn4", "nome": "ESPN 4", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=espn4" },
+  { "id": "fishtv", "nome": "Fish TV", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=fishtv" },
+  { "id": "fx", "nome": "FX", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=fx" },
+  { "id": "globonews", "nome": "GloboNews", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=globonews" },
+  { "id": "gnt", "nome": "GNT", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=gnt" },
+  { "id": "hbo", "nome": "HBO", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=hbo" },
+  { "id": "hbo2", "nome": "HBO 2", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=hbo2" },
+  { "id": "hbofamily", "nome": "HBO Family", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=hbofamily" },
+  { "id": "hbomundi", "nome": "HBO Mundi", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=hbomundi" },
+  { "id": "hbosignature", "nome": "HBO Signature", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=hbosignature" },
+  { "id": "hgtv", "nome": "HGTV", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=hgtv" },
+  { "id": "natgeo", "nome": "National Geographic", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=natgeo" },
+  { "id": "nick", "nome": "Nickelodeon", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=nick" },
+  { "id": "nickjr", "nome": "Nick Jr.", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=nickjr" },
+  { "id": "off", "nome": "Canal Off", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=off" },
+  { "id": "paramount", "nome": "Paramount Channel", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=paramount" },
+  { "id": "premiereclubes", "nome": "Premiere Clubes", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=premiereclubes" },
+  { "id": "record", "nome": "Record", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=record" },
+  { "id": "recordnews", "nome": "Record News", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=recordnews" },
+  { "id": "redetv", "nome": "RedeTV!", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=redetv" },
+  { "id": "sbt", "nome": "SBT", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=sbt" },
+  { "id": "sony", "nome": "Sony Channel", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=sony" },
+  { "id": "space", "nome": "Space", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=space" },
+  { "id": "sportv1", "nome": "SporTV 1", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=sportv1" },
+  { "id": "sportv2", "nome": "SporTV 2", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=sportv2" },
+  { "id": "sportv3", "nome": "SporTV 3", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=sportv3" },
+  { "id": "starchannel", "nome": "Star Channel", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=starchannel" },
+  { "id": "syfy", "nome": "Syfy", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=syfy" },
+  { "id": "tlc", "nome": "TLC", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=tlc" },
+  { "id": "telecineaction", "nome": "Telecine Action", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=telecineaction" },
+  { "id": "telecinecult", "nome": "Telecine Cult", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=telecinecult" },
+  { "id": "telecinefun", "nome": "Telecine Fun", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=telecinefun" },
+  { "id": "universal", "nome": "Universal TV", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=universal" },
+  { "id": "warner", "nome": "Warner Channel", "src": "https://outbound-proxy-us-east1-0-blob-usercontent-client-id-7775691497.googleapis.com.de/player3/ch.php?canal=warner" }
 ]
