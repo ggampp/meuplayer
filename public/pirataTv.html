@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer - PirataTV</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      html, body { height: 100%; overflow: hidden; }
+
+      .pirata-layout {
+        display: flex;
+        height: calc(100vh - 52px);
+      }
+
+      /* ── Channel sidebar ── */
+      .pirata-sidebar {
+        width: 210px;
+        min-width: 180px;
+        overflow-y: auto;
+        border-right: 1px solid var(--outline);
+        background: var(--bg-soft);
+        padding-bottom: 16px;
+        flex-shrink: 0;
+      }
+      .pirata-sidebar::-webkit-scrollbar { width: 4px; }
+      .pirata-sidebar::-webkit-scrollbar-thumb { background: var(--outline); border-radius: 2px; }
+
+      .pirata-cat-heading {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        padding: 14px 16px 4px;
+      }
+
+      .pirata-channel-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        border-left: 3px solid transparent;
+        color: var(--muted);
+        padding: 7px 14px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+      }
+      .pirata-channel-btn:hover {
+        background: rgba(255,255,255,0.05);
+        color: var(--text);
+        border-left-color: rgba(229,9,20,0.35);
+      }
+      .pirata-channel-btn.active {
+        background: rgba(229,9,20,0.1);
+        color: var(--text);
+        border-left-color: var(--accent);
+      }
+      .pirata-channel-btn .has-guide {
+        font-size: 0.6rem;
+        color: var(--accent);
+        opacity: 0.7;
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+
+      /* ── Player area ── */
+      .pirata-viewer {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #000;
+        position: relative;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .pirata-viewer webview {
+        flex: 1;
+        width: 100%;
+        border: none;
+      }
+
+      .pirata-placeholder {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--muted);
+      }
+      .pirata-placeholder svg { opacity: 0.25; }
+      .pirata-placeholder p { font-size: 0.9rem; }
+
+      .guide-toggle-btn {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        z-index: 10;
+        background: rgba(20,20,30,0.85);
+        border: 1px solid var(--outline);
+        color: var(--text);
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.78rem;
+        backdrop-filter: blur(4px);
+        transition: background 0.15s;
+      }
+      .guide-toggle-btn:hover { background: rgba(40,40,55,0.95); }
+      .guide-toggle-btn.active { border-color: var(--accent); color: var(--accent); }
+
+      /* ── Guide panel ── */
+      .pirata-guide {
+        width: 290px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--outline);
+        background: var(--bg-soft);
+        overflow: hidden;
+        transition: width 0.2s ease, min-width 0.2s ease;
+        flex-shrink: 0;
+      }
+      .pirata-guide.hidden { width: 0; border-left: none; }
+
+      .guide-header {
+        padding: 12px 14px 8px;
+        border-bottom: 1px solid var(--outline);
+        flex-shrink: 0;
+      }
+      .guide-header h3 {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      .guide-header .guide-canal-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .guide-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+      }
+      .guide-list::-webkit-scrollbar { width: 4px; }
+      .guide-list::-webkit-scrollbar-thumb { background: var(--outline); border-radius: 2px; }
+
+      .guide-item {
+        display: flex;
+        gap: 10px;
+        padding: 8px 14px;
+        border-left: 3px solid transparent;
+        opacity: 0.7;
+        transition: opacity 0.1s;
+      }
+      .guide-item:hover { opacity: 1; background: rgba(255,255,255,0.03); }
+      .guide-item.current {
+        opacity: 1;
+        border-left-color: var(--accent);
+        background: rgba(229,9,20,0.07);
+      }
+      .guide-item.past { opacity: 0.4; }
+
+      .guide-time {
+        font-size: 0.8rem;
+        color: var(--muted);
+        white-space: nowrap;
+        padding-top: 1px;
+        min-width: 36px;
+        font-variant-numeric: tabular-nums;
+      }
+      .guide-item.current .guide-time { color: var(--accent); }
+
+      .guide-info { min-width: 0; }
+      .guide-title {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .guide-genre {
+        display: block;
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+
+      .guide-empty {
+        padding: 24px 14px;
+        font-size: 0.85rem;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .guide-loading {
+        padding: 20px 14px;
+        font-size: 0.82rem;
+        color: var(--muted);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/nav.js"></script>
+
+    <div class="pirata-layout">
+
+      <!-- Channel list -->
+      <aside class="pirata-sidebar" id="sidebar"></aside>
+
+      <!-- Player -->
+      <section class="pirata-viewer" id="viewer">
+        <div class="pirata-placeholder" id="placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+          <p>Selecione um canal para assistir</p>
+        </div>
+        <button class="guide-toggle-btn" id="guideToggle" title="Mostrar/ocultar guia de programação">
+          📋 Guia
+        </button>
+      </section>
+
+      <!-- Programming guide -->
+      <aside class="pirata-guide hidden" id="guide">
+        <div class="guide-header">
+          <h3>Programação hoje</h3>
+          <div class="guide-canal-name" id="guideCanalName">—</div>
+        </div>
+        <div class="guide-list" id="guideList">
+          <p class="guide-empty">Selecione um canal com guia disponível</p>
+        </div>
+      </aside>
+
+    </div>
+
+    <script>
+      const CHANNELS = [
+        { cat: 'Esportes',       nome: 'Band Sports',      slug: 'band-sports',      guia: 'BSP' },
+        { cat: 'Esportes',       nome: 'Combate',           slug: 'combate',           guia: '135' },
+        { cat: 'Esportes',       nome: 'Canal Off',         slug: 'canal-off',         guia: 'OFF' },
+        { cat: 'Esportes',       nome: 'ESPN',              slug: null,                guia: 'ESP' },
+        { cat: 'Esportes',       nome: 'SporTV',            slug: 'sportv1',           guia: 'SPO' },
+        { cat: 'Esportes',       nome: 'SporTV 2',          slug: 'sportv2',           guia: 'SP2' },
+        { cat: 'Esportes',       nome: 'SporTV 3',          slug: 'sportv3',           guia: 'SP3' },
+        { cat: 'Esportes',       nome: 'Premiere Clubes',   slug: 'premiereclubes',    guia: '121' },
+        { cat: 'Filmes',         nome: 'Cinecanal',         slug: 'cinecanal',         guia: null  },
+        { cat: 'Filmes',         nome: 'Cinemax',           slug: 'cinemax',           guia: 'MNX' },
+        { cat: 'Filmes',         nome: 'AXN',               slug: 'axn',               guia: 'AXN' },
+        { cat: 'Filmes',         nome: 'AMC Brasil',        slug: 'amc-brasil',        guia: 'MGM' },
+        { cat: 'Filmes',         nome: 'A&E',               slug: 'ae-mundo',          guia: 'MDO' },
+        { cat: 'Notícias',       nome: 'Band News',         slug: 'band-news',         guia: 'NEW' },
+        { cat: 'Notícias',       nome: 'CNN Brasil',        slug: 'cnn-brasil',        guia: 'CNN' },
+        { cat: 'Notícias',       nome: 'GloboNews',         slug: null,                guia: 'GLN' },
+        { cat: 'Entretenimento', nome: 'Band',              slug: 'band',              guia: null  },
+        { cat: 'Entretenimento', nome: 'Comedy Central',    slug: 'comedy-central',    guia: 'CCE' },
+        { cat: 'Entretenimento', nome: 'BIS',               slug: 'bis',               guia: 'MSH' },
+        { cat: 'Entretenimento', nome: 'Arte 1',            slug: 'arte-1',            guia: 'BQ5' },
+        { cat: 'Entretenimento', nome: 'Canal Curta',       slug: 'canal-curta',       guia: null  },
+        { cat: 'Entretenimento', nome: 'Modo Viagem',       slug: 'modo-viagem',       guia: null  },
+        { cat: 'Infantil',       nome: 'Cartoon Network',   slug: 'cartoon-network',   guia: 'CAR' },
+        { cat: 'Infantil',       nome: 'Boomerang',         slug: 'boomerang',         guia: null  },
+        { cat: 'Infantil',       nome: 'Cartoonito',        slug: 'cartoonito-tv',     guia: null  },
+        { cat: 'Infantil',       nome: 'Discovery Kids',    slug: 'discovery-kids',    guia: 'DIK' },
+        { cat: 'Documentários',  nome: 'Discovery Channel', slug: 'discovery-channel', guia: 'DIS' },
+        { cat: 'Documentários',  nome: 'Discovery Science', slug: 'discovery-science', guia: 'DSC' },
+        { cat: 'Documentários',  nome: 'Discovery Turbo',   slug: 'discovery-turbo',   guia: 'DTU' },
+        { cat: 'Documentários',  nome: 'Discovery World',   slug: 'discovery-world',   guia: 'DIW' },
+        { cat: 'Documentários',  nome: 'Animal Planet',     slug: 'animal-planet',     guia: 'APL' },
+      ];
+
+      (function () {
+        const sidebar      = document.getElementById('sidebar');
+        const viewer       = document.getElementById('viewer');
+        const placeholder  = document.getElementById('placeholder');
+        const guidePanel   = document.getElementById('guide');
+        const guideList    = document.getElementById('guideList');
+        const guideName    = document.getElementById('guideCanalName');
+        const toggleBtn    = document.getElementById('guideToggle');
+
+        let activeBtn      = null;
+        let currentWebview = null;
+        let guideVisible   = false;
+        let guideAbortCtrl = null;
+
+        // ── Build sidebar ──────────────────────────────────────
+        const cats = {};
+        CHANNELS.forEach((ch) => {
+          if (!cats[ch.cat]) cats[ch.cat] = [];
+          cats[ch.cat].push(ch);
+        });
+
+        Object.entries(cats).forEach(([cat, channels]) => {
+          const heading = document.createElement('div');
+          heading.className = 'pirata-cat-heading';
+          heading.textContent = cat;
+          sidebar.appendChild(heading);
+
+          channels.forEach((ch) => {
+            const btn = document.createElement('button');
+            btn.className = 'pirata-channel-btn';
+            btn.innerHTML = `<span>${ch.nome}</span>${ch.guia ? '<span class="has-guide" title="Guia disponível">●</span>' : ''}`;
+            btn.addEventListener('click', () => selectChannel(ch, btn));
+            sidebar.appendChild(btn);
+          });
+        });
+
+        // ── Guide toggle ───────────────────────────────────────
+        toggleBtn.addEventListener('click', () => {
+          guideVisible = !guideVisible;
+          guidePanel.classList.toggle('hidden', !guideVisible);
+          toggleBtn.classList.toggle('active', guideVisible);
+        });
+
+        // ── Select channel ─────────────────────────────────────
+        function selectChannel(ch, btn) {
+          if (activeBtn) activeBtn.classList.remove('active');
+          activeBtn = btn;
+          btn.classList.add('active');
+          loadPlayer(ch);
+          if (guideVisible) loadGuide(ch);
+        }
+
+        function loadPlayer(ch) {
+          if (currentWebview) currentWebview.remove();
+          if (placeholder) placeholder.remove();
+
+          if (!ch.slug) {
+            const msg = document.createElement('div');
+            msg.className = 'pirata-placeholder';
+            msg.innerHTML = '<p>Player não disponível para este canal</p>';
+            viewer.appendChild(msg);
+            currentWebview = msg;
+            return;
+          }
+
+          const wv = document.createElement('webview');
+          wv.src = 'https://piratatvs.com/' + ch.slug + '-ao-vivo/';
+          wv.setAttribute('allowpopups', '');
+          wv.setAttribute('useragent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+          viewer.appendChild(wv);
+          currentWebview = wv;
+        }
+
+        // ── Guide ──────────────────────────────────────────────
+        function loadGuide(ch) {
+          if (guideAbortCtrl) guideAbortCtrl.abort();
+          guideAbortCtrl = new AbortController();
+
+          guideName.textContent = ch.nome;
+          guideList.innerHTML = '<p class="guide-loading">Carregando...</p>';
+
+          if (!guideVisible) {
+            guidePanel.classList.remove('hidden');
+            toggleBtn.classList.add('active');
+            guideVisible = true;
+          }
+
+          if (!ch.guia) {
+            guideList.innerHTML = '<p class="guide-empty">Guia não disponível para este canal.</p>';
+            return;
+          }
+
+          fetch('/api/guia?canal=' + ch.guia, { signal: guideAbortCtrl.signal })
+            .then((r) => r.json())
+            .then((schedule) => renderGuide(schedule))
+            .catch((err) => {
+              if (err.name === 'AbortError') return;
+              guideList.innerHTML = '<p class="guide-empty">Erro ao carregar o guia.</p>';
+            });
+        }
+
+        function renderGuide(schedule) {
+          if (!Array.isArray(schedule) || schedule.length === 0) {
+            guideList.innerHTML = '<p class="guide-empty">Programação não encontrada.</p>';
+            return;
+          }
+
+          const now = new Date();
+          const nowMins = now.getHours() * 60 + now.getMinutes();
+
+          function toMins(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+          }
+
+          // Determine current program
+          let currentIdx = 0;
+          for (let i = 0; i < schedule.length; i++) {
+            if (toMins(schedule[i].time) <= nowMins) currentIdx = i;
+          }
+
+          guideList.innerHTML = '';
+
+          schedule.forEach((item, idx) => {
+            const div = document.createElement('div');
+            const mins = toMins(item.time);
+            const isCurrent = idx === currentIdx;
+            const isPast = mins < nowMins && !isCurrent;
+
+            div.className = 'guide-item' + (isCurrent ? ' current' : '') + (isPast ? ' past' : '');
+            div.innerHTML = `
+              <span class="guide-time">${item.time}</span>
+              <div class="guide-info">
+                <span class="guide-title" title="${item.title || ''}">${item.title || '—'}</span>
+                ${item.genre ? `<span class="guide-genre">${item.genre}</span>` : ''}
+              </div>`;
+            guideList.appendChild(div);
+          });
+
+          // Scroll current item into view
+          const currentEl = guideList.querySelector('.guide-item.current');
+          if (currentEl) currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      })();
+    </script>
+  </body>
+</html>

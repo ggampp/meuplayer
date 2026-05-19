@@ -1,0 +1,29 @@
+{
+  "name": "meuplayer",
+  "version": "1.0.0",
+  "description": "MeuPlayer Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.meuplayer.app",
+    "productName": "MeuPlayer",
+    "files": [
+      "main.js",
+      "server.py",
+      "public/**/*",
+      "!public/cache/**"
+    ],
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage" },
+    "mac": { "target": "dmg" }
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
