@@ -124,6 +124,8 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             return "/index.html"
         if path in ("/canais", "/canais/"):
             return "/canais.html"
+        if path in ("/pirataTv", "/pirataTv/"):
+            return "/pirataTv.html"
 
         route_map = {
             "/filme": "/filme.html",

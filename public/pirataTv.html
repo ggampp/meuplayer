@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer - PirataTV</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .pirata-layout {
+        display: flex;
+        height: calc(100vh - 52px);
+      }
+
+      .pirata-sidebar {
+        width: 210px;
+        min-width: 180px;
+        overflow-y: auto;
+        border-right: 1px solid var(--outline);
+        background: var(--bg-soft);
+        padding-bottom: 16px;
+        flex-shrink: 0;
+      }
+
+      .pirata-sidebar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .pirata-sidebar::-webkit-scrollbar-thumb {
+        background: var(--outline);
+        border-radius: 2px;
+      }
+
+      .pirata-cat-heading {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        padding: 14px 16px 4px;
+      }
+
+      .pirata-channel-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        border-left: 3px solid transparent;
+        color: var(--muted);
+        padding: 7px 14px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+      }
+
+      .pirata-channel-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        border-left-color: rgba(229, 9, 20, 0.35);
+      }
+
+      .pirata-channel-btn.active {
+        background: rgba(229, 9, 20, 0.1);
+        color: var(--text);
+        border-left-color: var(--accent);
+      }
+
+      .pirata-viewer {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #000;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .pirata-viewer webview {
+        flex: 1;
+        width: 100%;
+        border: none;
+      }
+
+      .pirata-placeholder {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--muted);
+      }
+
+      .pirata-placeholder svg {
+        opacity: 0.25;
+      }
+
+      .pirata-placeholder p {
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/nav.js"></script>
+
+    <div class="pirata-layout">
+      <aside class="pirata-sidebar" id="sidebar"></aside>
+      <section class="pirata-viewer" id="viewer">
+        <div class="pirata-placeholder" id="placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+          <p>Selecione um canal para assistir</p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const CHANNELS = [
+        { cat: 'Esportes',       nome: 'Band Sports',       slug: 'band-sports' },
+        { cat: 'Esportes',       nome: 'Combate',            slug: 'combate' },
+        { cat: 'Esportes',       nome: 'Canal Off',          slug: 'canal-off' },
+        { cat: 'Filmes',         nome: 'Cinecanal',          slug: 'cinecanal' },
+        { cat: 'Filmes',         nome: 'Cinemax',            slug: 'cinemax' },
+        { cat: 'Filmes',         nome: 'AXN',                slug: 'axn' },
+        { cat: 'Filmes',         nome: 'AMC Brasil',         slug: 'amc-brasil' },
+        { cat: 'Filmes',         nome: 'A&E',                slug: 'ae-mundo' },
+        { cat: 'Notícias',       nome: 'Band News',          slug: 'band-news' },
+        { cat: 'Notícias',       nome: 'CNN Brasil',         slug: 'cnn-brasil' },
+        { cat: 'Entretenimento', nome: 'Band',               slug: 'band' },
+        { cat: 'Entretenimento', nome: 'Comedy Central',     slug: 'comedy-central' },
+        { cat: 'Entretenimento', nome: 'BIS',                slug: 'bis' },
+        { cat: 'Entretenimento', nome: 'Arte 1',             slug: 'arte-1' },
+        { cat: 'Entretenimento', nome: 'Canal Curta',        slug: 'canal-curta' },
+        { cat: 'Entretenimento', nome: 'Modo Viagem',        slug: 'modo-viagem' },
+        { cat: 'Infantil',       nome: 'Cartoon Network',    slug: 'cartoon-network' },
+        { cat: 'Infantil',       nome: 'Boomerang',          slug: 'boomerang' },
+        { cat: 'Infantil',       nome: 'Cartoonito',         slug: 'cartoonito-tv' },
+        { cat: 'Infantil',       nome: 'Discovery Kids',     slug: 'discovery-kids' },
+        { cat: 'Documentários',  nome: 'Discovery Channel',  slug: 'discovery-channel' },
+        { cat: 'Documentários',  nome: 'Discovery Science',  slug: 'discovery-science' },
+        { cat: 'Documentários',  nome: 'Discovery Turbo',    slug: 'discovery-turbo' },
+        { cat: 'Documentários',  nome: 'Discovery World',    slug: 'discovery-world' },
+        { cat: 'Documentários',  nome: 'Animal Planet',      slug: 'animal-planet' },
+      ];
+
+      (function () {
+        const sidebar = document.getElementById('sidebar');
+        const viewer = document.getElementById('viewer');
+        const placeholder = document.getElementById('placeholder');
+        let activeBtn = null;
+        let currentWebview = null;
+
+        const cats = {};
+        CHANNELS.forEach((ch) => {
+          if (!cats[ch.cat]) cats[ch.cat] = [];
+          cats[ch.cat].push(ch);
+        });
+
+        Object.entries(cats).forEach(([cat, channels]) => {
+          const heading = document.createElement('div');
+          heading.className = 'pirata-cat-heading';
+          heading.textContent = cat;
+          sidebar.appendChild(heading);
+
+          channels.forEach((ch) => {
+            const btn = document.createElement('button');
+            btn.className = 'pirata-channel-btn';
+            btn.textContent = ch.nome;
+            btn.addEventListener('click', () => {
+              if (activeBtn) activeBtn.classList.remove('active');
+              activeBtn = btn;
+              btn.classList.add('active');
+              loadChannel(ch.slug);
+            });
+            sidebar.appendChild(btn);
+          });
+        });
+
+        function loadChannel(slug) {
+          if (currentWebview) currentWebview.remove();
+          if (placeholder) placeholder.remove();
+
+          const wv = document.createElement('webview');
+          wv.src = 'https://piratatvs.com/' + slug + '-ao-vivo/';
+          wv.setAttribute('allowpopups', '');
+          wv.setAttribute('useragent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+          viewer.appendChild(wv);
+          currentWebview = wv;
+        }
+      })();
+    </script>
+  </body>
+</html>
