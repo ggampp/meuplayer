@@ -6,6 +6,26 @@ const categories = [
   { key: "serie", label: "Séries" },
   { key: "anime", label: "Animes" },
 ];
+
+const LANGUAGE_OPTIONS = [
+  { value: "all", label: "Todos os idiomas" },
+  { value: "pt", label: "Português" },
+  { value: "en", label: "Inglês" },
+  { value: "es", label: "Espanhol" },
+  { value: "ko", label: "Coreano" },
+  { value: "ja", label: "Japonês" },
+  { value: "zh", label: "Chinês" },
+  { value: "fr", label: "Francês" },
+  { value: "de", label: "Alemão" },
+  { value: "it", label: "Italiano" },
+  { value: "hi", label: "Hindi" },
+  { value: "th", label: "Tailandês" },
+  { value: "vi", label: "Vietnamita" },
+  { value: "id", label: "Indonésio" },
+  { value: "tr", label: "Turco" },
+  { value: "ru", label: "Russo" },
+  { value: "ar", label: "Árabe" },
+];
 const IMAGE_BASE = "/api/image/tmdb/w500";
 const BACKDROP_BASE = "/api/image/tmdb/w1280";
 const STILL_BASE = "/api/image/tmdb/w780";
@@ -26,6 +46,22 @@ function mediaTypeToRoute(type) {
   if (type === "movie") return "filme";
   if (type === "anime") return "anime";
   return "serie";
+}
+
+function tmdbAppType(type) {
+  if (type === "movie") return "movie";
+  return "serie";
+}
+
+async function fetchMetaBatch(type, ids) {
+  if (!ids.length) return {};
+  const unique = [...new Set(ids.map(String))].slice(0, 80);
+  const query = new URLSearchParams({
+    type: tmdbAppType(type),
+    ids: unique.join(","),
+  });
+  const data = await fetchJson(`/api/media/meta/batch?${query.toString()}`);
+  return data.items || {};
 }
 
 function fetchJson(path) {
@@ -68,6 +104,68 @@ function buildPlayerUrl({ id, type, season, episode, provider }) {
   return `https://superflixapi.one/serie/${id}/${seasonValue}/${episodeValue}`;
 }
 
+const ANIMATION_GENRE_ID = 16;
+
+function matchesOriginalLanguage(meta, languageFilter) {
+  if (!languageFilter || languageFilter === "all") return true;
+  if (!meta) return false;
+  const lang = (meta.original_language || "").toLowerCase();
+  if (lang === languageFilter) return true;
+  if (languageFilter === "zh" && (lang === "cn" || lang === "tw")) return true;
+  return false;
+}
+
+function isAnimationTv(meta) {
+  if (!meta) return false;
+  const genreIds = [...(meta.genre_ids || [])];
+  (meta.genres || []).forEach((genre) => {
+    genreIds.push(genre.id ?? genre);
+  });
+  return genreIds.includes(ANIMATION_GENRE_ID);
+}
+
+function emptyCatalog() {
+  return { movie: [], serie: [], anime: [] };
+}
+
+function categoriesForTypeFilter(typeFilter) {
+  if (typeFilter === "all") return categories;
+  return categories.filter((category) => category.key === typeFilter);
+}
+
+function buildDiscoverParams(apiType, { genreId, language, page = "1" } = {}) {
+  const params = new URLSearchParams({ type: apiType, page });
+  if (genreId) params.set("genre", genreId);
+  if (language && language !== "all") {
+    params.set("original_language", language);
+  }
+  return params;
+}
+
+function applyDiscoverItems(nextResults, nextMeta, items, options = {}) {
+  const { onlyType, tvAs } = options;
+  items.filter(isReleased).forEach((item) => {
+    const id = String(item.id);
+    let type = "movie";
+    if (item.media_type === "tv" || tvAs) {
+      const animated = isAnimationTv(item);
+      if (onlyType === "anime") {
+        if (!animated) return;
+        type = "anime";
+      } else if (onlyType === "serie") {
+        if (animated) return;
+        type = "serie";
+      } else {
+        type = animated ? "anime" : "serie";
+      }
+    } else if (onlyType && onlyType !== "movie") {
+      return;
+    }
+    nextResults[type].push({ id, type, meta: item });
+    nextMeta[`${type}-${id}`] = item;
+  });
+}
+
 function isReleased(meta) {
   if (!meta) return true;
   const dateText = meta.release_date || meta.first_air_date;
@@ -77,56 +175,65 @@ function isReleased(meta) {
   return parsed <= Date.now();
 }
 
+function MediaCard({ item, meta, onSelect, compact = false }) {
+  const displayTitle =
+    meta?.title ||
+    meta?.name ||
+    meta?.original_title ||
+    meta?.original_name ||
+    item.id;
+  const originalTitle =
+    meta?.original_title || meta?.original_name || displayTitle;
+  const year = (meta?.release_date || meta?.first_air_date || "").slice(0, 4);
+  const posterPath = meta?.poster_path ? `${IMAGE_BASE}${meta.poster_path}` : "";
+  const overview = meta?.overview || "Sinopse não disponível.";
+
+  return (
+    <button
+      type="button"
+      className={`card${compact ? " card--compact" : ""}`}
+      onClick={() => onSelect(item)}
+    >
+      <div className="card__media">
+        {posterPath ? (
+          <img src={posterPath} alt={displayTitle} loading="lazy" />
+        ) : (
+          <span className="card__placeholder">Sem capa</span>
+        )}
+      </div>
+      <div className="card__descriptions">
+        <h3 className="card__title">{displayTitle}</h3>
+        {!compact ? (
+          <>
+            <p className="card__meta">
+              {originalTitle}
+              {year ? ` · ${year}` : ""}
+            </p>
+            <p className="card__overview">{overview}</p>
+            <span className="card__cta">Assistir agora</span>
+          </>
+        ) : (
+          <span className="card__cta">Ver detalhes</span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 function GridRow({ title, items, onSelect, hasMore, onMore }) {
   return (
     <div className="row">
       <div className="row__title">{title}</div>
       <div className="row__grid">
         {items.length ? (
-          items.map((item) => {
-            const meta = item.meta || {};
-            const displayTitle =
-              meta.title ||
-              meta.name ||
-              meta.original_title ||
-              meta.original_name ||
-              item.id;
-            const originalTitle =
-              meta.original_title || meta.original_name || displayTitle;
-            const year =
-              (meta.release_date || meta.first_air_date || "").slice(0, 4);
-            const posterPath = meta.poster_path
-              ? `${IMAGE_BASE}${meta.poster_path}`
-              : "";
-            return (
-              <button
-                key={`${item.type}-${item.id}`}
-                className="card"
-                onClick={() => onSelect(item)}
-              >
-                <div
-                  className="card__poster"
-                  style={
-                    posterPath
-                      ? { backgroundImage: `url(${posterPath})` }
-                      : undefined
-                  }
-                >
-                  {!posterPath ? (
-                    <span className="card__placeholder">Sem capa</span>
-                  ) : null}
-                </div>
-                <div className="card__body">
-                  <span className="card__title">{displayTitle}</span>
-                  <span className="card__subtitle">
-                    {originalTitle}
-                    {year ? ` · ${year}` : ""}
-                  </span>
-                  <span className="card__action">Assistir agora</span>
-                </div>
-              </button>
-            );
-          })
+          items.map((item) => (
+            <MediaCard
+              key={`${item.type}-${item.id}`}
+              item={item}
+              meta={item.meta || {}}
+              onSelect={onSelect}
+            />
+          ))
         ) : (
           <div className="rows__status">Nenhum item encontrado.</div>
         )}
@@ -146,11 +253,13 @@ function App() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState(ROUTE_TYPE || "all");
   const [genreFilter, setGenreFilter] = useState("all");
+  const [languageFilter, setLanguageFilter] = useState("all");
   const [genres, setGenres] = useState({ movie: [], tv: [] });
   const [searchResults, setSearchResults] = useState(null);
   const [genreResults, setGenreResults] = useState(null);
+  const [languageResults, setLanguageResults] = useState(null);
   const [searching, setSearching] = useState(false);
-  const [loadingGenre, setLoadingGenre] = useState(false);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [displayCounts, setDisplayCounts] = useState({
     movie: 10,
     serie: 10,
@@ -167,44 +276,30 @@ function App() {
   const [relatedItems, setRelatedItems] = useState([]);
 
   useEffect(() => {
+    fetchJson("/api/media/stored?limit=120")
+      .then((data) => {
+        const items = data.items || [];
+        if (!items.length) return;
+        setMetaMap((prev) => {
+          const next = { ...prev };
+          items.forEach((item) => {
+            if (item?.id && item?.meta) {
+              next[`${item.type}-${item.id}`] = item.meta;
+            }
+          });
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setGenreFilter("all");
   }, [typeFilter]);
 
   useEffect(() => {
     setDisplayCounts({ movie: 10, serie: 10, anime: 10 });
-  }, [lists, searchResults]);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        setStatus("Carregando...");
-        const categoriesToFetch =
-          typeFilter === "all"
-            ? categories
-            : categories.filter((category) => category.key === typeFilter);
-        const results = await Promise.all(
-          categoriesToFetch.map((category) =>
-            fetchJson(
-              `/api/lista?category=${category.key}&type=tmdb&format=json&order=desc`
-            ).then(normalizeList)
-          )
-        );
-        const next = {};
-        categories.forEach((category) => {
-          next[category.key] = [];
-        });
-        categoriesToFetch.forEach((category, index) => {
-          next[category.key] = results[index];
-        });
-        setLists(next);
-        setStatus("Catálogo atualizado");
-      } catch (error) {
-        console.error(error);
-        setStatus("Erro ao carregar catálogo");
-      }
-    }
-    load();
-  }, [typeFilter, genreFilter]);
+  }, [typeFilter, genreFilter, languageFilter]);
 
   useEffect(() => {
     Promise.all([
@@ -219,55 +314,123 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (genreFilter === "all") {
-      setGenreResults(null);
-      setLoadingGenre(false);
-      return;
-    }
+    if (search.trim().length >= 2) return;
 
     let active = true;
-    setLoadingGenre(true);
-    const [filterType, filterId] = genreFilter.split(":");
-    const apiType = filterType === "movie" ? "movie" : "tv";
-    const targetType = apiType === "movie"
-      ? "movie"
-      : typeFilter === "anime"
-        ? "anime"
-        : "serie";
 
-    fetchJson(
-      `/api/tmdb/discover?type=${apiType}&genre=${encodeURIComponent(filterId)}&page=1`
-    )
-      .then((data) => {
-        if (!active) return;
-        const items = (data?.results || []).slice(0, 50).filter(isReleased);
-        const nextResults = { movie: [], serie: [], anime: [] };
-        const nextMeta = {};
-        nextResults[targetType] = items.map((item) => ({
-          id: String(item.id),
-          type: targetType,
-          meta: item,
-        }));
-        items.forEach((item) => {
-          nextMeta[`${targetType}-${item.id}`] = item;
-        });
-        setMetaMap((prev) => ({ ...prev, ...nextMeta }));
-        setGenreResults(nextResults);
-      })
-      .catch((error) => {
-        console.error(error);
-        if (active) {
-          setGenreResults({ movie: [], serie: [], anime: [] });
+    async function loadCatalog() {
+      setLoadingCatalog(true);
+      setStatus("Carregando...");
+      setGenreResults(null);
+      setLanguageResults(null);
+
+      try {
+        if (genreFilter !== "all") {
+          const [filterType, filterId] = genreFilter.split(":");
+          const apiType = filterType === "movie" ? "movie" : "tv";
+          const discoverParams = buildDiscoverParams(apiType, {
+            genreId: filterId,
+            language: languageFilter,
+          });
+          const data = await fetchJson(
+            `/api/tmdb/discover?${discoverParams.toString()}`
+          );
+          if (!active) return;
+
+          const nextResults = emptyCatalog();
+          const nextMeta = {};
+          const options = { tvAs: apiType === "tv" };
+          if (typeFilter === "anime") options.onlyType = "anime";
+          else if (typeFilter === "serie") options.onlyType = "serie";
+          else if (typeFilter === "movie") options.onlyType = "movie";
+
+          applyDiscoverItems(
+            nextResults,
+            nextMeta,
+            (data?.results || []).slice(0, 50),
+            options
+          );
+          setMetaMap((prev) => ({ ...prev, ...nextMeta }));
+          setGenreResults(nextResults);
+          setStatus("Catálogo atualizado");
+          return;
         }
-      })
-      .finally(() => {
-        if (active) setLoadingGenre(false);
-      });
 
+        if (languageFilter !== "all") {
+          const nextResults = emptyCatalog();
+          const nextMeta = {};
+          const requests = [];
+
+          if (typeFilter === "all" || typeFilter === "movie") {
+            requests.push(
+              fetchJson(
+                `/api/tmdb/discover?${buildDiscoverParams("movie", {
+                  language: languageFilter,
+                }).toString()}`
+              ).then((data) => ({ scope: "movie", data }))
+            );
+          }
+          if (typeFilter === "all" || typeFilter === "serie" || typeFilter === "anime") {
+            requests.push(
+              fetchJson(
+                `/api/tmdb/discover?${buildDiscoverParams("tv", {
+                  language: languageFilter,
+                }).toString()}`
+              ).then((data) => ({ scope: "tv", data }))
+            );
+          }
+
+          const responses = await Promise.all(requests);
+          if (!active) return;
+
+          responses.forEach(({ scope, data }) => {
+            const options = { tvAs: scope === "tv" };
+            if (typeFilter === "anime") options.onlyType = "anime";
+            else if (typeFilter === "serie") options.onlyType = "serie";
+            else if (typeFilter === "movie") options.onlyType = "movie";
+            applyDiscoverItems(
+              nextResults,
+              nextMeta,
+              (data?.results || []).slice(0, 50),
+              options
+            );
+          });
+
+          setMetaMap((prev) => ({ ...prev, ...nextMeta }));
+          setLanguageResults(nextResults);
+          setStatus("Catálogo atualizado");
+          return;
+        }
+
+        const categoriesToFetch = categoriesForTypeFilter(typeFilter);
+        const results = await Promise.all(
+          categoriesToFetch.map((category) =>
+            fetchJson(
+              `/api/lista?category=${category.key}&type=tmdb&format=json&order=desc`
+            ).then(normalizeList)
+          )
+        );
+        if (!active) return;
+
+        const next = emptyCatalog();
+        categoriesToFetch.forEach((category, index) => {
+          next[category.key] = results[index];
+        });
+        setLists(next);
+        setStatus("Catálogo atualizado");
+      } catch (error) {
+        console.error(error);
+        if (active) setStatus("Erro ao carregar catálogo");
+      } finally {
+        if (active) setLoadingCatalog(false);
+      }
+    }
+
+    loadCatalog();
     return () => {
       active = false;
     };
-  }, [genreFilter, typeFilter]);
+  }, [typeFilter, genreFilter, languageFilter, search]);
 
   useEffect(() => {
     const term = search.trim();
@@ -305,10 +468,15 @@ function App() {
       Promise.all(requests)
         .then((results) => {
           if (!active) return;
-          const nextResults = { movie: [], serie: [], anime: [] };
+          const nextResults = emptyCatalog();
           const nextMeta = {};
           results.forEach((result) => {
-            const items = (result.data?.results || []).slice(0, 50).filter(isReleased);
+            let items = (result.data?.results || []).slice(0, 50).filter(isReleased);
+            if (languageFilter !== "all") {
+              items = items.filter((item) =>
+                matchesOriginalLanguage(item, languageFilter)
+              );
+            }
             if (result.type === "movie") {
               nextResults.movie = items.map((item) => ({
                 id: String(item.id),
@@ -346,40 +514,44 @@ function App() {
       active = false;
       clearTimeout(timer);
     };
-  }, [search, typeFilter]);
+  }, [search, typeFilter, languageFilter]);
 
   useEffect(() => {
-    const sourceLists = searchResults || genreResults || lists;
-    const items = [];
+    const sourceLists =
+      searchResults || genreResults || languageResults || lists;
+    const pendingByType = {};
     categories.forEach((category) => {
       const list = sourceLists[category.key] || [];
       const limit = displayCounts[category.key] || 10;
       list.slice(0, limit).forEach((entry) => {
         const id = typeof entry === "object" ? entry.id : entry;
         if (!id) return;
-        const key = `${category.key}-${id}`;
-        if (!metaMap[key]) {
-          items.push({ id, type: category.key, key });
-        }
+        const itemType = typeof entry === "object" ? entry.type || category.key : category.key;
+        const key = `${itemType}-${id}`;
+        if (metaMap[key]) return;
+        if (!pendingByType[itemType]) pendingByType[itemType] = [];
+        pendingByType[itemType].push(String(id));
       });
     });
-    if (!items.length) return;
+
+    const requests = Object.entries(pendingByType)
+      .filter(([, ids]) => ids.length)
+      .map(([type, ids]) =>
+        fetchMetaBatch(type, ids).then((items) => ({ type, items }))
+      );
+
+    if (!requests.length) return;
 
     let cancelled = false;
-    Promise.all(
-      items.map((item) =>
-        fetchJson(`/api/tmdb?type=${item.type}&id=${item.id}`)
-          .then((data) => ({ key: item.key, data }))
-          .catch(() => null)
-      )
-    ).then((results) => {
+    Promise.all(requests).then((results) => {
       if (cancelled) return;
       setMetaMap((prev) => {
         const next = { ...prev };
-        results.forEach((result) => {
-          if (result && result.data) {
-            next[result.key] = result.data;
-          }
+        results.forEach(({ type, items }) => {
+          Object.entries(items).forEach(([id, data]) => {
+            if (!data) return;
+            next[`${type}-${id}`] = data;
+          });
         });
         return next;
       });
@@ -388,7 +560,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [lists, searchResults, genreResults, metaMap, displayCounts]);
+  }, [lists, searchResults, genreResults, languageResults, metaMap, displayCounts]);
 
   const selectedMeta = useMemo(() => {
     if (!selected) return null;
@@ -404,8 +576,15 @@ function App() {
 
   const filteredRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    const sourceLists = searchResults || genreResults || lists;
-    return categories.map((category) => {
+    const sourceLists =
+      searchResults || genreResults || languageResults || lists;
+    const apiCatalog = Boolean(genreResults || languageResults);
+    const visibleCategories = ROUTE_TYPE
+      ? categories.filter((category) => category.key === ROUTE_TYPE)
+      : typeFilter === "all"
+        ? categories
+        : categories.filter((category) => category.key === typeFilter);
+    return visibleCategories.map((category) => {
       let items =
         (sourceLists[category.key] || []).map((entry) => {
           if (typeof entry === "object") {
@@ -440,7 +619,7 @@ function App() {
       if (typeFilter !== "all") {
         items = items.filter((item) => item.type === typeFilter);
       }
-      if (genreFilter !== "all") {
+      if (genreFilter !== "all" && !apiCatalog) {
         const [filterType, filterId] = genreFilter.split(":");
         items = items.filter((item) => {
           const meta = item.meta || {};
@@ -474,6 +653,7 @@ function App() {
     genreFilter,
     searchResults,
     genreResults,
+    languageResults,
     displayCounts,
   ]);
 
@@ -634,12 +814,37 @@ function App() {
   );
 
   const rowsLabel = useMemo(() => {
+    const langLabel =
+      languageFilter !== "all"
+        ? LANGUAGE_OPTIONS.find((opt) => opt.value === languageFilter)?.label
+        : null;
     if (searching) return "Buscando na API...";
-    if (searchResults) return "Resultados da pesquisa";
-    if (loadingGenre) return "Filtrando por gênero na API...";
-    if (genreResults) return "Resultados por gênero";
+    if (loadingCatalog) return "Carregando catálogo...";
+    if (searchResults) {
+      return langLabel
+        ? `Resultados da pesquisa · idioma ${langLabel}`
+        : "Resultados da pesquisa";
+    }
+    if (genreResults) {
+      return langLabel
+        ? `Catálogo por gênero · idioma ${langLabel}`
+        : "Catálogo por gênero";
+    }
+    if (languageResults) {
+      return langLabel
+        ? `Catálogo por idioma · ${langLabel}`
+        : "Catálogo por idioma";
+    }
     return status;
-  }, [searching, searchResults, loadingGenre, genreResults, status]);
+  }, [
+    searching,
+    searchResults,
+    loadingCatalog,
+    genreResults,
+    languageResults,
+    status,
+    languageFilter,
+  ]);
 
   const handleMore = (key) => {
     setDisplayCounts((prev) => ({
@@ -805,43 +1010,15 @@ function App() {
                 <div className="detail__related">
                   <h2>Itens relacionados</h2>
                   <div className="detail__related-grid">
-                    {relatedItems.map((item) => {
-                      const meta = item.meta || {};
-                      const title =
-                        meta.title ||
-                        meta.name ||
-                        meta.original_title ||
-                        meta.original_name ||
-                        item.id;
-                      const posterPath = meta.poster_path
-                        ? `${IMAGE_BASE}${meta.poster_path}`
-                        : "";
-                      return (
-                        <button
-                          key={`${item.type}-${item.id}`}
-                          className="card"
-                          onClick={() => openDetail(item)}
-                        >
-                          <div
-                            className="card__poster"
-                            style={
-                              posterPath
-                                ? { backgroundImage: `url(${posterPath})` }
-                                : undefined
-                            }
-                          >
-                            {!posterPath ? (
-                              <span className="card__placeholder">
-                                Sem capa
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="card__body">
-                            <span className="card__title">{title}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {relatedItems.map((item) => (
+                      <MediaCard
+                        key={`${item.type}-${item.id}`}
+                        item={item}
+                        meta={item.meta || {}}
+                        onSelect={openDetail}
+                        compact
+                      />
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -879,6 +1056,19 @@ function App() {
                 {genreOptions.map((genre) => (
                   <option key={genre.value} value={genre.value}>
                     {genre.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Idioma original
+              <select
+                value={languageFilter}
+                onChange={(e) => setLanguageFilter(e.target.value)}
+              >
+                {LANGUAGE_OPTIONS.map((lang) => (
+                  <option key={lang.value} value={lang.value}>
+                    {lang.label}
                   </option>
                 ))}
               </select>

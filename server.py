@@ -27,6 +27,7 @@ ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
 load_env(ENV_PATH)
 
 API_BASE = "https://superflixapi.one"
+RDE_API_BASE = "https://reidosembeds.com/api"
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
@@ -41,9 +42,34 @@ TTL_TMDB_SEARCH_SECONDS = 24 * 60 * 60
 TTL_TMDB_SEASON_SECONDS = 3 * 24 * 60 * 60
 TTL_TMDB_RELATED_SECONDS = 3 * 24 * 60 * 60
 TTL_IMAGE_SECONDS = 30 * 24 * 60 * 60
+TTL_LISTA_SECONDS = 6 * 60 * 60
+TTL_RDE_SECONDS = 30 * 60
 
 TMDB_CACHE = {}
 DB_LOCK = threading.Lock()
+
+ANIMATION_GENRE_ID = 16
+
+
+def _tmdb_media_type(app_type):
+    return "movie" if app_type == "movie" else "tv"
+
+
+def _media_storage_key(app_type, tmdb_id):
+    return f"{_tmdb_media_type(app_type)}:{tmdb_id}"
+
+
+def _is_animation_tv(meta):
+    if not meta:
+        return False
+    genre_ids = []
+    for genre in meta.get("genres") or []:
+        if isinstance(genre, dict):
+            genre_ids.append(genre.get("id"))
+        else:
+            genre_ids.append(genre)
+    genre_ids.extend(meta.get("genre_ids") or [])
+    return ANIMATION_GENRE_ID in genre_ids
 
 
 def _connect_cache_db():
@@ -61,8 +87,79 @@ def _connect_cache_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS media_metadata (
+            media_key TEXT PRIMARY KEY,
+            media_type TEXT NOT NULL,
+            tmdb_id TEXT NOT NULL,
+            body BLOB NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """
+    )
     conn.commit()
     return conn
+
+
+def _media_metadata_get(media_key):
+    with DB_LOCK:
+        row = DB_CONN.execute(
+            """
+            SELECT body FROM media_metadata WHERE media_key = ?
+            """,
+            (media_key,),
+        ).fetchone()
+    if not row:
+        return None
+    return row[0]
+
+
+def _media_metadata_set(media_key, media_type, tmdb_id, body):
+    now = int(time())
+    with DB_LOCK:
+        DB_CONN.execute(
+            """
+            INSERT INTO media_metadata (media_key, media_type, tmdb_id, body, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(media_key) DO UPDATE SET
+                media_type = excluded.media_type,
+                tmdb_id = excluded.tmdb_id,
+                body = excluded.body,
+                updated_at = excluded.updated_at
+            """,
+            (media_key, media_type, tmdb_id, body, now),
+        )
+        DB_CONN.commit()
+
+
+def _warm_tmdb_images(meta):
+    if not isinstance(meta, dict):
+        return
+    paths = []
+    for key in ("poster_path", "backdrop_path"):
+        path = meta.get(key)
+        if path:
+            paths.append(path)
+    for size, rel_path in (("w500", paths[0] if paths else None), ("w1280", paths[-1] if len(paths) > 1 else None)):
+        if not rel_path:
+            continue
+        local_path = os.path.join(IMAGE_CACHE_DIR, size, rel_path.lstrip("/"))
+        if os.path.exists(local_path):
+            continue
+        try:
+            remote_url = f"{TMDB_IMAGE_BASE}/{size}/{rel_path.lstrip('/')}"
+            req = Request(remote_url, headers={"User-Agent": "MeuPlayer/1.0"})
+            with urlopen(req, timeout=20) as response:
+                body = response.read()
+                if response.status == 200:
+                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                    tmp_path = f"{local_path}.tmp"
+                    with open(tmp_path, "wb") as file:
+                        file.write(body)
+                    os.replace(tmp_path, local_path)
+        except Exception:
+            pass
 
 
 DB_CONN = _connect_cache_db()
@@ -81,10 +178,75 @@ ALLOWED_IMAGE_SIZES = {
     "original",
 }
 
+# 1x1 GIF transparente para fallback de capa ausente
+PLACEHOLDER_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04"
+    b"\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x01D\x00;"
+)
+
+CLIENT_DISCONNECT_ERRORS = (
+    ConnectionAbortedError,
+    ConnectionResetError,
+    BrokenPipeError,
+)
+
+
+def _is_client_disconnect(exc):
+    if isinstance(exc, CLIENT_DISCONNECT_ERRORS):
+        return True
+    if isinstance(exc, OSError):
+        winerror = getattr(exc, "winerror", None)
+        if winerror in (10053, 10054):
+            return True
+    return False
+
 
 class MeuPlayerHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
+
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except Exception as exc:
+            if _is_client_disconnect(exc):
+                return
+            raise
+
+    def log_message(self, format, *args):
+        message = format % args
+        if "10053" in message or "10054" in message:
+            return
+        super().log_message(format, *args)
+
+    def log_error(self, format, *args):
+        message = format % args
+        if "10053" in message or "10054" in message:
+            return
+        super().log_error(format, *args)
+
+    def log_exception(self, exc_info):
+        if exc_info and exc_info[1] and _is_client_disconnect(exc_info[1]):
+            return
+        super().log_exception(exc_info)
+
+    def _safe_write(self, body):
+        try:
+            self.wfile.write(body)
+        except Exception as exc:
+            if _is_client_disconnect(exc):
+                return False
+            raise
+        return True
+
+    def _safe_end_headers(self):
+        try:
+            self.end_headers()
+        except Exception as exc:
+            if _is_client_disconnect(exc):
+                return False
+            raise
+        return True
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -123,6 +285,21 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/guia":
             self._proxy_guia(parsed.query)
             return
+        if parsed.path == "/api/media/meta/batch":
+            self._api_media_meta_batch(parsed.query)
+            return
+        if parsed.path == "/api/media/stored":
+            self._api_media_stored(parsed.query)
+            return
+        if parsed.path == "/api/rede-buzz/channels":
+            self._proxy_rede_buzz_channels(parsed.query)
+            return
+        if parsed.path == "/api/rede-buzz/categories":
+            self._proxy_rede_buzz_categories()
+            return
+        if parsed.path == "/api/rede-buzz/search":
+            self._proxy_rede_buzz_search(parsed.query)
+            return
         super().do_GET()
 
     def _resolve_site_route(self, path):
@@ -130,6 +307,8 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             return "/index.html"
         if path in ("/canais", "/canais/"):
             return "/canais.html"
+        if path in ("/rede-buzz", "/rede-buzz/"):
+            return "/rede-buzz.html"
         route_map = {
             "/filme": "/filme.html",
             "/anime": "/anime.html",
@@ -146,46 +325,73 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         params = parse_qs(query)
         if "format" not in params:
             params["format"] = ["json"]
+        cache_key = f"lista:{urlencode(sorted(params.items()))}"
+        cached = self._cache_get(cache_key)
+        if cached:
+            self._send_response(
+                cached["status"],
+                cached["content_type"],
+                cached["body"],
+                cache_status="HIT",
+            )
+            return
         url = f"{API_BASE}/lista?{urlencode(params, doseq=True)}"
-        self._proxy_simple(url)
+        try:
+            req = Request(url, headers={"User-Agent": "MeuPlayer/1.0"})
+            with urlopen(req, timeout=15) as response:
+                body = response.read()
+                content_type = response.headers.get("Content-Type", "application/json")
+                if response.status == 200:
+                    self._cache_set(
+                        cache_key=cache_key,
+                        status=response.status,
+                        content_type=content_type,
+                        body=body,
+                        ttl_seconds=TTL_LISTA_SECONDS,
+                    )
+                self._send_response(response.status, content_type, body, cache_status="MISS")
+        except Exception as exc:
+            self._send_json_error(502, "Falha ao acessar a API externa", str(exc))
 
     def _proxy_simple(self, url):
         try:
             req = Request(url, headers={"User-Agent": "MeuPlayer/1.0"})
             with urlopen(req, timeout=15) as response:
                 body = response.read()
-                self.send_response(response.status)
                 content_type = response.headers.get("Content-Type", "application/json")
-                self.send_header("Content-Type", content_type)
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(body)
+                self._send_response(response.status, content_type, body)
         except Exception as exc:
-            self.send_response(502)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            payload = {"error": "Falha ao acessar a API externa", "detail": str(exc)}
-            self.wfile.write(json.dumps(payload).encode("utf-8"))
+            if not _is_client_disconnect(exc):
+                self._send_json_error(502, "Falha ao acessar a API externa", str(exc))
 
     def _send_json_error(self, status_code, error, detail=None):
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        payload = {"error": error}
-        if detail:
-            payload["detail"] = detail
-        self.wfile.write(json.dumps(payload).encode("utf-8"))
+        try:
+            self.send_response(status_code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            if not self._safe_end_headers():
+                return
+            payload = {"error": error}
+            if detail:
+                payload["detail"] = detail
+            self._safe_write(json.dumps(payload).encode("utf-8"))
+        except Exception as exc:
+            if not _is_client_disconnect(exc):
+                raise
 
     def _send_response(self, status_code, content_type, body, cache_status=None):
-        self.send_response(status_code)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        if cache_status:
-            self.send_header("X-Cache", cache_status)
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status_code)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            if cache_status:
+                self.send_header("X-Cache", cache_status)
+            if not self._safe_end_headers():
+                return
+            self._safe_write(body)
+        except Exception as exc:
+            if not _is_client_disconnect(exc):
+                raise
 
     def _safe_image_cache_path(self, size, image_rel_path):
         decoded = unquote(image_rel_path).lstrip("/")
@@ -234,30 +440,53 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
                     with open(tmp_path, "wb") as file:
                         file.write(body)
                     os.replace(tmp_path, local_path)
-                self.send_response(response.status)
-                self.send_header("Content-Type", content_type)
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("X-Cache", "MISS")
-                self.send_header("Cache-Control", f"public, max-age={TTL_IMAGE_SECONDS}")
-                self.end_headers()
-                self.wfile.write(body)
+                    self._send_image_body(body, content_type, cache_status="MISS")
+                    return
         except Exception:
-            if stale_exists:
-                self._serve_local_image(local_path)
-                return
-            self._send_json_error(502, "Falha ao acessar imagem do TMDB")
+            pass
 
-    def _serve_local_image(self, local_path):
-        content_type = mimetypes.guess_type(local_path)[0] or "application/octet-stream"
-        with open(local_path, "rb") as file:
-            body = file.read()
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("X-Cache", "HIT")
-        self.send_header("Cache-Control", f"public, max-age={TTL_IMAGE_SECONDS}")
-        self.end_headers()
-        self.wfile.write(body)
+        if stale_exists:
+            self._serve_local_image(local_path, cache_status="STALE")
+            return
+
+        self._send_image_placeholder()
+
+    def _send_image_body(self, body, content_type, cache_status="HIT"):
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("X-Cache", cache_status)
+            self.send_header("Cache-Control", f"public, max-age={TTL_IMAGE_SECONDS}")
+            if not self._safe_end_headers():
+                return
+            self._safe_write(body)
+        except Exception as exc:
+            if not _is_client_disconnect(exc):
+                raise
+
+    def _send_image_placeholder(self):
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "image/gif")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("X-Cache", "PLACEHOLDER")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            if not self._safe_end_headers():
+                return
+            self._safe_write(PLACEHOLDER_GIF)
+        except Exception as exc:
+            if not _is_client_disconnect(exc):
+                raise
+
+    def _serve_local_image(self, local_path, cache_status="HIT"):
+        try:
+            content_type = mimetypes.guess_type(local_path)[0] or "application/octet-stream"
+            with open(local_path, "rb") as file:
+                body = file.read()
+            self._send_image_body(body, content_type, cache_status=cache_status)
+        except OSError:
+            self._send_image_placeholder()
 
     def _cache_get(self, cache_key):
         cached = TMDB_CACHE.get(cache_key)
@@ -362,6 +591,49 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         )
         return False
 
+    def _fetch_tmdb_detail(self, app_type, tmdb_id):
+        tmdb_media = _tmdb_media_type(app_type)
+        storage_key = _media_storage_key(app_type, tmdb_id)
+        cache_key = f"tmdb:{tmdb_media}:{tmdb_id}:pt-BR"
+
+        stored = _media_metadata_get(storage_key)
+        if stored:
+            return stored, "application/json", "STORE"
+
+        cached = self._cache_get(cache_key)
+        if cached:
+            if cached["status"] == 200:
+                _media_metadata_set(storage_key, tmdb_media, tmdb_id, cached["body"])
+                try:
+                    meta = json.loads(cached["body"].decode("utf-8"))
+                    _warm_tmdb_images(meta)
+                except Exception:
+                    pass
+            return cached["body"], cached["content_type"], "HIT"
+
+        url = f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}?api_key={TMDB_API_KEY}&language=pt-BR"
+        try:
+            req = Request(url, headers={"User-Agent": "MeuPlayer/1.0"})
+            with urlopen(req, timeout=15) as response:
+                body = response.read()
+                content_type = response.headers.get("Content-Type", "application/json")
+                if response.status == 200:
+                    self._cache_set(
+                        cache_key=cache_key,
+                        status=response.status,
+                        content_type=content_type,
+                        body=body,
+                        ttl_seconds=TTL_TMDB_DETAILS_SECONDS,
+                    )
+                    _media_metadata_set(storage_key, tmdb_media, tmdb_id, body)
+                    try:
+                        _warm_tmdb_images(json.loads(body.decode("utf-8")))
+                    except Exception:
+                        pass
+                return body, content_type, "MISS"
+        except Exception as exc:
+            raise exc
+
     def _proxy_tmdb(self, query):
         if not self._ensure_tmdb_key():
             return
@@ -373,10 +645,70 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             self._send_json_error(400, "Parâmetro id é obrigatório")
             return
 
-        tmdb_media = "movie" if media_type == "movie" else "tv"
-        cache_key = f"tmdb:{tmdb_media}:{tmdb_id}:pt-BR"
-        url = f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}?api_key={TMDB_API_KEY}&language=pt-BR"
-        self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_DETAILS_SECONDS)
+        try:
+            body, content_type, cache_status = self._fetch_tmdb_detail(media_type, tmdb_id)
+            self._send_response(200, content_type, body, cache_status=cache_status)
+        except Exception as exc:
+            self._send_json_error(502, "Falha ao acessar o TMDB", str(exc))
+
+    def _api_media_meta_batch(self, query):
+        if not self._ensure_tmdb_key():
+            return
+
+        params = parse_qs(query)
+        media_type = params.get("type", ["movie"])[0]
+        raw_ids = params.get("ids", [""])[0]
+        ids = [value.strip() for value in raw_ids.split(",") if value.strip()]
+        if not ids:
+            self._send_json_error(400, "Parâmetro ids é obrigatório")
+            return
+
+        items = {}
+        for tmdb_id in ids[:80]:
+            try:
+                body, _, cache_status = self._fetch_tmdb_detail(media_type, tmdb_id)
+                meta = json.loads(body.decode("utf-8"))
+                meta["_cache"] = cache_status
+                items[tmdb_id] = meta
+            except Exception:
+                items[tmdb_id] = None
+
+        payload = json.dumps({"items": items}, ensure_ascii=False).encode("utf-8")
+        self._send_response(200, "application/json; charset=utf-8", payload)
+
+    def _api_media_stored(self, query):
+        params = parse_qs(query)
+        limit = min(int(params.get("limit", ["200"])[0] or 200), 500)
+        with DB_LOCK:
+            rows = DB_CONN.execute(
+                """
+                SELECT media_key, media_type, tmdb_id, body, updated_at
+                FROM media_metadata
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        items = []
+        for media_key, media_type, tmdb_id, body, updated_at in rows:
+            try:
+                meta = json.loads(body.decode("utf-8"))
+            except Exception:
+                continue
+            app_type = "movie" if media_type == "movie" else "serie"
+            if media_type == "tv" and _is_animation_tv(meta):
+                app_type = "anime"
+            items.append({
+                "id": tmdb_id,
+                "type": app_type,
+                "media_key": media_key,
+                "updated_at": updated_at,
+                "meta": meta,
+            })
+
+        payload = json.dumps({"items": items}, ensure_ascii=False).encode("utf-8")
+        self._send_response(200, "application/json; charset=utf-8", payload)
 
     def _proxy_tmdb_genres(self, query):
         if not self._ensure_tmdb_key():
@@ -415,25 +747,47 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
 
         params = parse_qs(query)
         media_type = params.get("type", ["movie"])[0]
-        genre_id = params.get("genre", [""])[0]
+        genre_id = params.get("genre", [""])[0].strip()
         page = params.get("page", ["1"])[0]
-        if not genre_id:
-            self._send_json_error(400, "Parâmetro genre é obrigatório")
+        original_language = params.get("original_language", [""])[0].strip().lower()
+        if not genre_id and not original_language:
+            self._send_json_error(
+                400,
+                "Informe genre e/ou original_language",
+            )
+            return
+        if original_language and not re.match(r"^[a-z]{2}$", original_language):
+            self._send_json_error(400, "Parâmetro original_language inválido")
             return
 
         tmdb_media = "movie" if media_type == "movie" else "tv"
         sort_by = "primary_release_date.desc" if tmdb_media == "movie" else "first_air_date.desc"
-        cache_key = f"discover:{tmdb_media}:{genre_id}:{sort_by}:{page}:pt-BR"
+        cache_key = f"discover:{tmdb_media}:{sort_by}:{page}:pt-BR"
+        if genre_id:
+            cache_key += f":genre:{genre_id}"
+        if original_language:
+            cache_key += f":lang:{original_language}"
         today = date.today().isoformat()
         date_filter = f"&primary_release_date.lte={today}" if tmdb_media == "movie" else f"&first_air_date.lte={today}"
+        lang_filter = (
+            f"&with_original_language={quote_plus(original_language)}"
+            if original_language
+            else ""
+        )
+        genre_filter = (
+            f"&with_genres={quote_plus(genre_id)}"
+            if genre_id
+            else ""
+        )
         url = (
             f"{TMDB_BASE}/discover/{tmdb_media}"
             f"?api_key={TMDB_API_KEY}"
             f"&language=pt-BR"
-            f"&with_genres={quote_plus(genre_id)}"
+            f"{genre_filter}"
             f"&include_adult=false"
             f"&sort_by={sort_by}"
             f"{date_filter}"
+            f"{lang_filter}"
             f"&page={quote_plus(page)}"
         )
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_SEARCH_SECONDS)
@@ -475,6 +829,63 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         )
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_RELATED_SECONDS)
 
+
+    def _proxy_rede_buzz_remote(self, url, cache_key):
+        cached = self._cache_get(cache_key)
+        if cached:
+            self._send_response(
+                cached["status"],
+                cached["content_type"],
+                cached["body"],
+                cache_status="HIT",
+            )
+            return
+        try:
+            req = Request(url, headers={"User-Agent": "MeuPlayer/1.0"})
+            with urlopen(req, timeout=20) as response:
+                body = response.read()
+                content_type = response.headers.get(
+                    "Content-Type", "application/json; charset=utf-8"
+                )
+                if response.status == 200:
+                    self._cache_set(
+                        cache_key=cache_key,
+                        status=response.status,
+                        content_type=content_type,
+                        body=body,
+                        ttl_seconds=TTL_RDE_SECONDS,
+                    )
+                self._send_response(response.status, content_type, body, cache_status="MISS")
+        except Exception as exc:
+            self._send_json_error(502, "Falha ao acessar Rei dos Embeds", str(exc))
+
+    def _proxy_rede_buzz_channels(self, query):
+        params = parse_qs(query)
+        category = params.get("category", [""])[0].strip()
+        if category:
+            url = (
+                f"{RDE_API_BASE}/channels"
+                f"?category={quote_plus(category)}"
+            )
+            cache_key = f"rde:channels:cat:{category.lower()}"
+        else:
+            url = f"{RDE_API_BASE}/channels"
+            cache_key = "rde:channels:all"
+        self._proxy_rede_buzz_remote(url, cache_key)
+
+    def _proxy_rede_buzz_categories(self):
+        url = f"{RDE_API_BASE}/channels/categories"
+        self._proxy_rede_buzz_remote(url, "rde:categories")
+
+    def _proxy_rede_buzz_search(self, query):
+        params = parse_qs(query)
+        term = params.get("q", [""])[0].strip()
+        if not term:
+            self._send_json_error(400, "Parâmetro q é obrigatório")
+            return
+        url = f"{RDE_API_BASE}/pesquisa?q={quote_plus(term)}"
+        cache_key = f"rde:search:{term.lower()}"
+        self._proxy_rede_buzz_remote(url, cache_key)
 
     def _parse_guia_html(self, html_bytes):
         class _Collector(HTMLParser):

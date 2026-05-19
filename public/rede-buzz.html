@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer - Rede Buzz</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .channels-page {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        height: calc(100vh - 52px);
+        min-height: 560px;
+        overflow: hidden;
+      }
+
+      .channels-sidebar {
+        border-right: 1px solid var(--outline);
+        background: var(--bg-soft);
+        display: grid;
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .channels-header {
+        padding: 24px 18px 10px;
+      }
+
+      .channels-page h1 {
+        font-size: 1.6rem;
+        margin: 0;
+      }
+
+      .channels-page .status {
+        color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.4;
+        padding: 0 18px 10px;
+      }
+
+      .channels-filters {
+        display: grid;
+        gap: 8px;
+        padding: 0 18px 12px;
+      }
+
+      .channels-filters label {
+        display: grid;
+        gap: 4px;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+
+      .channels-filters input,
+      .channels-filters select {
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--outline);
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+      }
+
+      .channels-page .channels-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        padding: 0 8px 16px;
+      }
+
+      .channels-page .channels-grid::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .channels-page .channels-grid::-webkit-scrollbar-thumb {
+        background: var(--outline);
+        border-radius: 2px;
+      }
+
+      .channels-page .channel-card {
+        border: 0;
+        border-left: 3px solid transparent;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        padding: 10px 12px;
+        text-align: left;
+        cursor: pointer;
+        font-size: 0.9rem;
+        min-height: 38px;
+      }
+
+      .channels-page .channel-card small {
+        display: block;
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .channels-page .channel-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        border-left-color: rgba(229, 9, 20, 0.35);
+      }
+
+      .channels-page .channel-card.active {
+        background: rgba(229, 9, 20, 0.1);
+        color: var(--text);
+        border-left-color: var(--accent);
+      }
+
+      .channels-player {
+        min-width: 0;
+        min-height: 0;
+        background: #000;
+        position: relative;
+      }
+
+      .channels-page iframe {
+        border: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        background: #000;
+        display: block;
+      }
+
+      .player-overlay {
+        position: fixed;
+        right: 22px;
+        top: 50%;
+        z-index: 20;
+        display: grid;
+        gap: 8px;
+        transform: translateY(-50%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease;
+      }
+
+      .player-overlay.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .player-overlay button {
+        width: 46px;
+        height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(10, 10, 16, 0.82);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 1.15rem;
+        backdrop-filter: blur(8px);
+      }
+
+      .player-overlay button:hover {
+        border-color: var(--accent);
+        background: rgba(229, 9, 20, 0.24);
+      }
+
+      #channelPlay {
+        display: none;
+      }
+
+      @media (max-width: 760px) {
+        .channels-page {
+          grid-template-columns: 1fr;
+          grid-template-rows: 280px minmax(0, 1fr);
+        }
+
+        .channels-sidebar {
+          border-right: 0;
+          border-bottom: 1px solid var(--outline);
+        }
+
+        .channels-header {
+          padding-top: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/nav.js"></script>
+    <main class="channels-page" id="rede-buzz">
+      <aside class="channels-sidebar">
+        <div class="channels-header">
+          <h1>Rede Buzz</h1>
+        </div>
+        <p class="status" id="channelsStatus">Carregando canais...</p>
+        <div class="channels-filters">
+          <label>
+            Buscar
+            <input
+              type="search"
+              id="channelSearch"
+              placeholder="Nome do canal..."
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            Categoria
+            <select id="channelCategory">
+              <option value="">Todas</option>
+            </select>
+          </label>
+        </div>
+        <div class="channels-grid" id="channelsGrid"></div>
+      </aside>
+      <section class="channels-player">
+        <iframe
+          id="player"
+          title="Player Rede Buzz"
+          allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *"
+          allowfullscreen
+          webkitallowfullscreen
+          mozallowfullscreen
+        ></iframe>
+      </section>
+      <div class="player-overlay" id="playerOverlay" aria-label="Controles do canal">
+        <button type="button" id="channelUp" title="Canal anterior">▲</button>
+        <button type="button" id="channelPlay" title="Tentar play">▶</button>
+        <button type="button" id="channelDown" title="Próximo canal">▼</button>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const grid = document.getElementById("channelsGrid");
+        const player = document.getElementById("player");
+        const overlay = document.getElementById("playerOverlay");
+        const channelUp = document.getElementById("channelUp");
+        const channelPlay = document.getElementById("channelPlay");
+        const channelDown = document.getElementById("channelDown");
+        const status = document.getElementById("channelsStatus");
+        const searchInput = document.getElementById("channelSearch");
+        const categorySelect = document.getElementById("channelCategory");
+        let channelList = [];
+        let channelButtons = [];
+        let activeIndex = -1;
+        let overlayTimer = null;
+        let searchTimer = null;
+
+        const IFRAME_ALLOW =
+          "autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *";
+
+        function buildEmbedUrl(channel) {
+          if (channel.src) return channel.src;
+          if (channel.id) return `https://rde.buzz/${channel.id}`;
+          return "";
+        }
+
+        function normalizeChannel(item) {
+          if (item.is_active === false) return null;
+          const id = String(item.id || "").trim();
+          const nome = item.name || item.nome || id || "Canal";
+          let src = item.embed_url || item.src || "";
+          if (!src && id) {
+            src = `https://rde.buzz/${id}`;
+          }
+          return {
+            id,
+            nome,
+            src,
+            category: item.category || "",
+          };
+        }
+
+        function extractChannels(payload) {
+          if (!payload || payload.success === false) return [];
+          const data = payload.data;
+          if (Array.isArray(data)) {
+            return data.map(normalizeChannel).filter(Boolean);
+          }
+          if (data && Array.isArray(data.channels)) {
+            return data.channels.map(normalizeChannel).filter(Boolean);
+          }
+          if (data && data.id && (data.embed_url || data.name)) {
+            const channel = normalizeChannel(data);
+            return channel ? [channel] : [];
+          }
+          return [];
+        }
+
+        function selectChannel(index) {
+          const channel = channelList[index];
+          const button = channelButtons[index];
+          if (!channel || !button) return;
+
+          channelButtons.forEach((item) => item.classList.remove("active"));
+          button.classList.add("active");
+          button.scrollIntoView({ block: "nearest" });
+          activeIndex = index;
+
+          const embedUrl = buildEmbedUrl(channel);
+          player.src = embedUrl;
+          player.setAttribute("allow", IFRAME_ALLOW);
+          status.textContent = `Canal atual: ${channel.nome}`;
+        }
+
+        function renderChannels(channels, options = {}) {
+          const { autoSelect = true } = options;
+          channelList = channels.filter((channel) => buildEmbedUrl(channel));
+          channelButtons = [];
+          grid.innerHTML = "";
+          activeIndex = -1;
+
+          if (!channelList.length) {
+            status.textContent = "Nenhum canal encontrado.";
+            player.removeAttribute("src");
+            return;
+          }
+
+          channelList.forEach((channel, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "channel-card";
+            button.innerHTML = `${channel.nome}${
+              channel.category
+                ? `<small>${channel.category}</small>`
+                : ""
+            }`;
+            button.addEventListener("click", () => selectChannel(index));
+            grid.appendChild(button);
+            channelButtons.push(button);
+          });
+
+          status.textContent = `${channelList.length} canal(is) disponível(is)`;
+          if (autoSelect) {
+            selectChannel(0);
+          }
+        }
+
+        function selectAdjacentChannel(direction) {
+          if (!channelList.length) return;
+          const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+          const nextIndex =
+            (currentIndex + direction + channelList.length) % channelList.length;
+          selectChannel(nextIndex);
+        }
+
+        window.meuPlayerSelectAdjacentChannel = selectAdjacentChannel;
+        window.meuPlayerRequestPlayClick = requestPlayClick;
+
+        function showOverlay() {
+          overlay.classList.add("is-visible");
+          if (overlayTimer) clearTimeout(overlayTimer);
+          overlayTimer = setTimeout(() => {
+            overlay.classList.remove("is-visible");
+          }, 2600);
+        }
+
+        window.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+          if (!channelList.length) return;
+          event.preventDefault();
+          selectAdjacentChannel(event.key === "ArrowUp" ? -1 : 1);
+        });
+
+        window.addEventListener("mousemove", showOverlay);
+        window.addEventListener("keydown", showOverlay);
+        channelUp.addEventListener("click", () => selectAdjacentChannel(-1));
+        channelDown.addEventListener("click", () => selectAdjacentChannel(1));
+        async function loadCategories() {
+          try {
+            const response = await fetch("/api/rede-buzz/categories");
+            if (!response.ok) return;
+            const payload = await response.json();
+            const items = Array.isArray(payload.data) ? payload.data : [];
+            items.forEach((item) => {
+              const option = document.createElement("option");
+              option.value = item.name || "";
+              option.textContent = item.name || item.id || "";
+              categorySelect.appendChild(option);
+            });
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        async function loadChannels() {
+          status.textContent = "Carregando canais...";
+          const category = categorySelect.value.trim();
+          const query = category
+            ? `?category=${encodeURIComponent(category)}`
+            : "";
+          const response = await fetch(`/api/rede-buzz/channels${query}`);
+          if (!response.ok) {
+            throw new Error("Falha ao carregar canais");
+          }
+          const payload = await response.json();
+          renderChannels(extractChannels(payload));
+        }
+
+        async function searchChannels(term) {
+          status.textContent = "Buscando...";
+          const response = await fetch(
+            `/api/rede-buzz/search?q=${encodeURIComponent(term)}`
+          );
+          if (!response.ok) {
+            throw new Error("Falha na busca");
+          }
+          const payload = await response.json();
+          renderChannels(extractChannels(payload));
+        }
+
+        categorySelect.addEventListener("change", () => {
+          searchInput.value = "";
+          loadChannels().catch((error) => {
+            status.textContent = "Erro ao carregar canais.";
+            console.error(error);
+          });
+        });
+
+        searchInput.addEventListener("input", () => {
+          const term = searchInput.value.trim();
+          if (searchTimer) clearTimeout(searchTimer);
+          searchTimer = setTimeout(() => {
+            if (term.length < 2) {
+              loadChannels().catch((error) => {
+                status.textContent = "Erro ao carregar canais.";
+                console.error(error);
+              });
+              return;
+            }
+            searchChannels(term).catch((error) => {
+              status.textContent = "Erro na busca.";
+              console.error(error);
+            });
+          }, 350);
+        });
+
+        loadCategories();
+        loadChannels().catch((error) => {
+          status.textContent = "Erro ao carregar canais da Rede Buzz.";
+          console.error(error);
+        });
+      })();
+    </script>
+  </body>
+</html>

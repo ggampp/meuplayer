@@ -5,8 +5,10 @@ MeuPlayer e um aplicativo desktop de catalogo e player feito com Electron, um se
 ## Recursos
 
 - Catalogo de filmes, series e animes com dados da API SuperFlix e metadados do TMDB.
+- Cache persistente local de metadados TMDB e imagens ja consultadas (SQLite + disco).
 - Player embutido para filmes, series e animes.
 - Aba `Canais` com canais ao vivo carregados a partir de `public/canais.json`.
+- Aba `Rede Buzz` com canais da API [Rei dos Embeds](https://reidosembeds.com/doc) (embed `rde.buzz`).
 - Submenu lateral de canais com destaque do canal atual.
 - Navegacao de canais por teclado:
   - `Seta para cima`: canal anterior.
@@ -65,6 +67,7 @@ npm run build:mac
 - `server.py`: servidor HTTP local, rotas do app, proxies de API e cache.
 - `public/app.jsx`: interface principal de filmes, series e animes.
 - `public/canais.html`: tela de canais ao vivo.
+- `public/rede-buzz.html`: tela Rede Buzz (Rei dos Embeds).
 - `public/canais.json`: lista de canais e URLs dos players.
 - `public/nav.js`: navegacao comum do app.
 - `cache.sqlite3`: cache local do projeto.
