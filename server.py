@@ -1,9 +1,11 @@
 import json
 import mimetypes
 import os
+import re
 import sqlite3
 import threading
 from datetime import date
+from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from time import time
 from urllib.parse import urlencode, urlparse, parse_qs, quote_plus, unquote
@@ -32,6 +34,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "public")
 DB_PATH = os.path.join(os.path.dirname(__file__), "cache.sqlite3")
 IMAGE_CACHE_DIR = os.path.join(STATIC_DIR, "cache", "images", "tmdb")
 
+TTL_GUIA_SECONDS = 30 * 60
 TTL_TMDB_DETAILS_SECONDS = 7 * 24 * 60 * 60
 TTL_TMDB_GENRES_SECONDS = 30 * 24 * 60 * 60
 TTL_TMDB_SEARCH_SECONDS = 24 * 60 * 60
@@ -116,6 +119,9 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/tmdb/related":
             self._proxy_tmdb_related(parsed.query)
+            return
+        if parsed.path == "/api/guia":
+            self._proxy_guia(parsed.query)
             return
         super().do_GET()
 
@@ -471,6 +477,90 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             f"?api_key={TMDB_API_KEY}&language=pt-BR&page=1"
         )
         self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_RELATED_SECONDS)
+
+
+    def _parse_guia_html(self, html_bytes):
+        class _Collector(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.chunks = []
+                self._skip = 0
+
+            def handle_starttag(self, tag, attrs):
+                if tag in ("script", "style", "noscript", "head"):
+                    self._skip += 1
+
+            def handle_endtag(self, tag):
+                if tag in ("script", "style", "noscript", "head"):
+                    self._skip = max(0, self._skip - 1)
+
+            def handle_data(self, data):
+                if self._skip:
+                    return
+                s = data.strip()
+                if s:
+                    self.chunks.append(s)
+
+        try:
+            html = html_bytes.decode("utf-8", errors="replace")
+            collector = _Collector()
+            collector.feed(html)
+
+            time_re = re.compile(r"^\d{1,2}:\d{2}$")
+            schedule = []
+            chunks = collector.chunks
+            i = 0
+
+            while i < len(chunks):
+                if time_re.match(chunks[i]):
+                    entry = {"time": chunks[i], "title": None, "genre": None}
+                    j = i + 1
+                    if j < len(chunks) and not time_re.match(chunks[j]):
+                        entry["title"] = chunks[j]
+                        j += 1
+                        if j < len(chunks) and "/" in chunks[j] and not time_re.match(chunks[j]):
+                            entry["genre"] = chunks[j]
+                            j += 1
+                    if entry["title"]:
+                        schedule.append(entry)
+                    i = j
+                else:
+                    i += 1
+
+            return schedule
+        except Exception:
+            return []
+
+    def _proxy_guia(self, query):
+        params = parse_qs(query)
+        canal = params.get("canal", [""])[0].strip().upper()
+        if not canal or not re.match(r"^[A-Z0-9]{1,10}$", canal):
+            self._send_json_error(400, "Parâmetro canal inválido ou ausente")
+            return
+
+        cache_key = f"guia:{canal}:{date.today().isoformat()}"
+        cached = self._cache_get(cache_key)
+        if cached:
+            self._send_response(cached["status"], cached["content_type"], cached["body"], cache_status="HIT")
+            return
+
+        url = f"https://meuguia.tv/programacao/canal/{canal}"
+        try:
+            req = Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept-Language": "pt-BR,pt;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            })
+            with urlopen(req, timeout=15) as response:
+                html_bytes = response.read()
+        except Exception as exc:
+            self._send_json_error(502, "Falha ao acessar o guia", str(exc))
+            return
+
+        schedule = self._parse_guia_html(html_bytes)
+        body = json.dumps(schedule, ensure_ascii=False).encode("utf-8")
+        self._cache_set(cache_key, 200, "application/json; charset=utf-8", body, TTL_GUIA_SECONDS)
+        self._send_response(200, "application/json; charset=utf-8", body, cache_status="MISS")
 
 
 def run():
