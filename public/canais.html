@@ -22,6 +22,14 @@
           <h1 class="workbench__title">Canais ao vivo</h1>
         </header>
         <p class="workbench__status" id="channelsStatus">Carregando canais...</p>
+        <div class="workbench__filters workbench__filters--mobile-only">
+          <label class="workbench__field">
+            Canal
+            <select id="channelMobileSelect">
+              <option value="">Carregando...</option>
+            </select>
+          </label>
+        </div>
         <div class="workbench__list" id="channelsGrid" role="listbox" aria-label="Lista de canais"></div>
       </aside>
       <section class="workbench__player" aria-label="Player do canal">
@@ -43,6 +51,7 @@
         const channelPlay = document.getElementById("channelPlay");
         const channelDown = document.getElementById("channelDown");
         const status = document.getElementById("channelsStatus");
+        const mobileSelect = document.getElementById("channelMobileSelect");
         let channelList = [];
         let channelButtons = [];
         let activeIndex = -1;
@@ -57,6 +66,7 @@
           button.classList.add("workbench__item--active");
           button.scrollIntoView({ block: "nearest" });
           activeIndex = index;
+          if (mobileSelect) mobileSelect.value = String(index);
           player.src = channel.src || "";
           status.textContent = `Canal atual · ${channel.nome || channel.id || "Canal"}`;
           scheduleAutoPlayClick();
@@ -77,6 +87,15 @@
           channelList = channels;
           channelButtons = [];
           grid.innerHTML = "";
+          if (mobileSelect) {
+            mobileSelect.innerHTML = "";
+            channels.forEach((channel, index) => {
+              const opt = document.createElement("option");
+              opt.value = String(index);
+              opt.textContent = channel.nome || channel.id || "Canal";
+              mobileSelect.appendChild(opt);
+            });
+          }
           channels.forEach((channel, index) => {
             const button = document.createElement("button");
             button.type = "button";
@@ -131,6 +150,13 @@
         channelUp.addEventListener("click", () => selectAdjacentChannel(-1));
         channelDown.addEventListener("click", () => selectAdjacentChannel(1));
         channelPlay.addEventListener("click", requestPlayClick);
+
+        if (mobileSelect) {
+          mobileSelect.addEventListener("change", () => {
+            const idx = parseInt(mobileSelect.value, 10);
+            if (!isNaN(idx)) selectChannel(idx);
+          });
+        }
 
         fetch("/canais.json")
           .then((response) => {

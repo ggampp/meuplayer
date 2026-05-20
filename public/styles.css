@@ -1109,6 +1109,14 @@ main {
   border: 1px solid var(--color-rule);
 }
 
+.workbench__field--mobile-channel {
+  display: none;
+}
+
+.workbench__filters--mobile-only {
+  display: none;
+}
+
 .workbench__list {
   display: flex;
   flex-direction: column;
@@ -1476,13 +1484,26 @@ main {
 
   .workbench {
     grid-template-columns: 1fr;
-    grid-template-rows: 280px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     height: calc(100vh - 52px);
   }
 
   .workbench__sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--color-rule);
+    overflow: visible;
+  }
+
+  .workbench__list {
+    display: none;
+  }
+
+  .workbench__field--mobile-channel {
+    display: grid;
+  }
+
+  .workbench__filters--mobile-only {
+    display: grid;
   }
 }
 
