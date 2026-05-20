@@ -955,6 +955,22 @@ main {
 }
 
 @media (max-width: 640px) {
+  .app-nav__catalog-status {
+    display: none;
+  }
+
+  .filters__field--genre {
+    display: none;
+  }
+
+  .app-nav__filters-inner {
+    width: 100%;
+  }
+
+  .filters__field--search {
+    flex: 1 1 100%;
+  }
+
   .modal__controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

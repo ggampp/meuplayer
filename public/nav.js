@@ -99,22 +99,7 @@
         display: block;
       }
       .app-nav {
-        flex-wrap: nowrap;
-        gap: var(--space-xs);
-      }
-      .app-nav__filters {
-        flex: 0 1 auto;
-        order: 10;
-        margin-left: auto;
-        justify-content: flex-end;
-      }
-    }
-    @media (max-width: 520px) {
-      .app-nav {
-        padding: 0 var(--space-sm);
-      }
-      .app-nav__logo {
-        margin-right: var(--space-2xs);
+        padding: var(--space-2xs) var(--space-sm) var(--space-xs);
       }
       .app-nav__filters {
         flex: 1 1 100%;
