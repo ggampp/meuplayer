@@ -1,4 +1,4 @@
-const { useEffect, useMemo, useState } = React;
+const { useEffect, useMemo, useState, useRef } = React;
 
 const API_BASE = "";
 const categories = [
@@ -38,23 +38,33 @@ function tmdbAppType(type) {
   return "serie";
 }
 
+const META_BATCH_CHUNK = 25;
+
 async function fetchMetaBatch(type, ids) {
   if (!ids.length) return {};
-  const unique = [...new Set(ids.map(String))].slice(0, 80);
-  const query = new URLSearchParams({
-    type: tmdbAppType(type),
-    ids: unique.join(","),
-  });
-  const data = await fetchJson(`/api/media/meta/batch?${query.toString()}`);
-  return data.items || {};
+  const unique = [...new Set(ids.map(String))];
+  const merged = {};
+  for (let offset = 0; offset < unique.length; offset += META_BATCH_CHUNK) {
+    const chunk = unique.slice(offset, offset + META_BATCH_CHUNK);
+    const query = new URLSearchParams({
+      type: tmdbAppType(type),
+      ids: chunk.join(","),
+    });
+    const data = await fetchJson(`/api/media/meta/batch?${query.toString()}`);
+    const items = data.items || {};
+    Object.assign(merged, items);
+  }
+  return merged;
 }
 
 function fetchJson(path) {
-  return fetch(`${API_BASE}${path}`).then((res) => {
+  return fetch(`${API_BASE}${path}`).then(async (res) => {
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error("Falha na API");
+      const detail = data.detail || data.error || "Falha na API";
+      throw new Error(detail);
     }
-    return res.json();
+    return data;
   });
 }
 
@@ -480,6 +490,18 @@ function App() {
   const [doramaPage, setDoramaPage] = useState(1);
   const [doramaHasMore, setDoramaHasMore] = useState(false);
   const [doramaLoading, setDoramaLoading] = useState(false);
+  const [tmdbConfigured, setTmdbConfigured] = useState(null);
+  const metaMapRef = useRef({});
+
+  useEffect(() => {
+    metaMapRef.current = metaMap;
+  }, [metaMap]);
+
+  useEffect(() => {
+    fetchJson("/api/settings")
+      .then((data) => setTmdbConfigured(Boolean(data.hasTmdbKey)))
+      .catch(() => setTmdbConfigured(false));
+  }, []);
 
   useEffect(() => {
     function onRemoteSearch(event) {
@@ -722,6 +744,8 @@ function App() {
   useEffect(() => {
     const sourceLists = searchResults || genreResults || lists;
     const pendingByType = {};
+    const currentMeta = metaMapRef.current;
+
     categories.forEach((category) => {
       const list = sourceLists[category.key] || [];
       const limit = displayCounts[category.key] || 10;
@@ -730,7 +754,7 @@ function App() {
         if (!id) return;
         const itemType = typeof entry === "object" ? entry.type || category.key : category.key;
         const key = `${itemType}-${id}`;
-        if (metaMap[key]) return;
+        if (currentMeta[key]) return;
         if (!pendingByType[itemType]) pendingByType[itemType] = [];
         pendingByType[itemType].push(String(id));
       });
@@ -745,24 +769,31 @@ function App() {
     if (!requests.length) return;
 
     let cancelled = false;
-    Promise.all(requests).then((results) => {
-      if (cancelled) return;
-      setMetaMap((prev) => {
-        const next = { ...prev };
-        results.forEach(({ type, items }) => {
-          Object.entries(items).forEach(([id, data]) => {
-            if (!data) return;
-            next[`${type}-${id}`] = data;
+    Promise.all(requests)
+      .then((results) => {
+        if (cancelled) return;
+        setMetaMap((prev) => {
+          const next = { ...prev };
+          results.forEach(({ type, items }) => {
+            Object.entries(items).forEach(([id, data]) => {
+              if (!data) return;
+              next[`${type}-${id}`] = data;
+            });
           });
+          return next;
         });
-        return next;
+      })
+      .catch((error) => {
+        console.error("Falha ao carregar metadados:", error);
+        setStatus((prev) =>
+          prev.includes("TMDB") ? prev : `${error.message || "Erro ao carregar capas"}`
+        );
       });
-    });
 
     return () => {
       cancelled = true;
     };
-  }, [lists, searchResults, genreResults, metaMap, displayCounts]);
+  }, [lists, searchResults, genreResults, displayCounts]);
 
   const selectedMeta = useMemo(() => {
     if (!selected) return null;
@@ -1143,13 +1174,16 @@ function App() {
   );
 
   const rowsLabel = useMemo(() => {
+    if (tmdbConfigured === false) {
+      return "Chave TMDB ausente — abra Configurações";
+    }
     if (searching) return "Buscando na API...";
     if (loadingCatalog) return "Carregando catálogo...";
     if (ROUTE_TYPE === "dorama" && doramaLoading && doramaPage === 1) return "Carregando doramas...";
     if (searchResults) return "Resultados da busca";
     if (genreResults) return "Filtro por gênero";
     return status;
-  }, [searching, searchResults, loadingCatalog, genreResults, status, doramaLoading, doramaPage]);
+  }, [searching, searchResults, loadingCatalog, genreResults, status, tmdbConfigured, doramaLoading, doramaPage]);
 
   const handleMore = (key) => {
     if (key === "dorama") {

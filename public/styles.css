@@ -369,7 +369,7 @@ main {
 
 .row__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(192px, 100%), 1fr));
   gap: var(--space-md);
 }
 
@@ -1779,7 +1779,7 @@ main {
   }
 
   .row__grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr));
     gap: var(--space-sm);
   }
 
@@ -1834,7 +1834,7 @@ main {
   }
 
   .card {
-    max-width: 320px;
+    max-width: 256px;
     margin: 0 auto;
   }
 }

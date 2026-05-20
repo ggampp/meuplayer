@@ -27,6 +27,25 @@ function loadSettings() {
   }
 }
 
+function loadProjectDotEnv() {
+  const envPath = path.join(__dirname, '.env');
+  try {
+    const raw = fs.readFileSync(envPath, 'utf8');
+    raw.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) return;
+      const index = trimmed.indexOf('=');
+      const key = trimmed.slice(0, index).trim();
+      const value = trimmed.slice(index + 1).trim();
+      if (key && !process.env[key]) {
+        process.env[key] = value;
+      }
+    });
+  } catch {
+    // .env opcional em desenvolvimento
+  }
+}
+
 function getServerLaunch() {
   if (app.isPackaged) {
     const resources = process.resourcesPath;
@@ -46,19 +65,35 @@ function getServerLaunch() {
   };
 }
 
-function buildServerEnv() {
+function resolveTmdbApiKey() {
   const settings = loadSettings();
-  const launch = getServerLaunch();
-  const tmdbApiKey =
-    settings.tmdbApiKey || process.env.TMDB_API_KEY || '';
+  if (settings.tmdbApiKey && String(settings.tmdbApiKey).trim()) {
+    return String(settings.tmdbApiKey).trim();
+  }
+  if (!app.isPackaged) {
+    loadProjectDotEnv();
+  }
+  if (process.env.TMDB_API_KEY && String(process.env.TMDB_API_KEY).trim()) {
+    return String(process.env.TMDB_API_KEY).trim();
+  }
+  return '';
+}
 
-  return {
+function buildServerEnv() {
+  const launch = getServerLaunch();
+  const tmdbApiKey = resolveTmdbApiKey();
+  const env = {
     ...process.env,
     PORT: String(PORT),
     MEUPLAYER_USER_DATA: getUserDataPath(),
     MEUPLAYER_STATIC_DIR: launch.staticDir,
-    TMDB_API_KEY: tmdbApiKey,
   };
+  if (tmdbApiKey) {
+    env.TMDB_API_KEY = tmdbApiKey;
+  } else {
+    delete env.TMDB_API_KEY;
+  }
+  return env;
 }
 
 function startServer() {
@@ -233,8 +268,27 @@ function blockPopupWindows() {
   });
 }
 
+function migrateDotEnvToSettings() {
+  const settings = loadSettings();
+  if (settings.tmdbApiKey && String(settings.tmdbApiKey).trim()) return;
+  loadProjectDotEnv();
+  const key = process.env.TMDB_API_KEY && String(process.env.TMDB_API_KEY).trim();
+  if (!key) return;
+  try {
+    fs.mkdirSync(getUserDataPath(), { recursive: true });
+    fs.writeFileSync(
+      getSettingsPath(),
+      `${JSON.stringify({ tmdbApiKey: key }, null, 2)}\n`,
+      'utf8'
+    );
+  } catch (error) {
+    console.error('[settings] Falha ao migrar .env:', error);
+  }
+}
+
 app.whenReady().then(() => {
   blockPopupWindows();
+  migrateDotEnvToSettings();
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };

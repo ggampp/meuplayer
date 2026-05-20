@@ -66,7 +66,23 @@ def apply_user_settings():
         os.environ["TMDB_API_KEY"] = key
 
 
-apply_user_settings()
+def bootstrap_tmdb_api_key():
+    """Prioridade: settings do usuário → .env do projeto (ignora TMDB_API_KEY vazio do Electron)."""
+    apply_user_settings()
+    if get_tmdb_api_key():
+        return
+    if not os.path.isfile(ENV_PATH):
+        return
+    with open(ENV_PATH, "r", encoding="utf-8") as file:
+        for line in file:
+            raw = line.strip()
+            if not raw or raw.startswith("#") or "=" not in raw:
+                continue
+            key, value = raw.split("=", 1)
+            if key.strip() == "TMDB_API_KEY" and value.strip():
+                os.environ["TMDB_API_KEY"] = value.strip()
+                break
+
 
 API_BASE = "https://superflixapi.one"
 RDE_API_BASE = "https://reidosembeds.com/api"
@@ -142,7 +158,11 @@ def sanitize_rede_buzz_json_body(body):
         return body
     filtered = filter_rede_buzz_payload(payload)
     return json.dumps(filtered, ensure_ascii=False).encode("utf-8")
+
+
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
+
+
 def get_tmdb_api_key():
     return os.getenv("TMDB_API_KEY", "").strip()
 
@@ -152,6 +172,10 @@ def mask_tmdb_api_key(key):
     if len(key) <= 8:
         return "••••" if key else ""
     return f"{key[:4]}…{key[-4:]}"
+
+
+bootstrap_tmdb_api_key()
+
 STATIC_DIR = os.environ.get("MEUPLAYER_STATIC_DIR") or os.path.join(BASE_DIR, "public")
 DB_PATH = os.path.join(user_data_dir(), "cache.sqlite3")
 IMAGE_CACHE_DIR = os.path.join(STATIC_DIR, "cache", "images", "tmdb")
@@ -843,7 +867,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         )
         return False
 
-    def _fetch_tmdb_detail(self, app_type, tmdb_id):
+    def _fetch_tmdb_detail(self, app_type, tmdb_id, warm_images=True):
         tmdb_media = _tmdb_media_type(app_type)
         storage_key = _media_storage_key(app_type, tmdb_id)
         cache_key = f"tmdb:{tmdb_media}:{tmdb_id}:pt-BR"
@@ -856,11 +880,12 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         if cached:
             if cached["status"] == 200:
                 _media_metadata_set(storage_key, tmdb_media, tmdb_id, cached["body"])
-                try:
-                    meta = json.loads(cached["body"].decode("utf-8"))
-                    _warm_tmdb_images(meta)
-                except Exception:
-                    pass
+                if warm_images:
+                    try:
+                        meta = json.loads(cached["body"].decode("utf-8"))
+                        _warm_tmdb_images(meta)
+                    except Exception:
+                        pass
             return cached["body"], cached["content_type"], "HIT"
 
         url = f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}?api_key={get_tmdb_api_key()}&language=pt-BR"
@@ -878,10 +903,11 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
                         ttl_seconds=TTL_TMDB_DETAILS_SECONDS,
                     )
                     _media_metadata_set(storage_key, tmdb_media, tmdb_id, body)
-                    try:
-                        _warm_tmdb_images(json.loads(body.decode("utf-8")))
-                    except Exception:
-                        pass
+                    if warm_images:
+                        try:
+                            _warm_tmdb_images(json.loads(body.decode("utf-8")))
+                        except Exception:
+                            pass
                 return body, content_type, "MISS"
         except Exception as exc:
             raise exc
@@ -918,7 +944,9 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         items = {}
         for tmdb_id in ids[:80]:
             try:
-                body, _, cache_status = self._fetch_tmdb_detail(media_type, tmdb_id)
+                body, _, cache_status = self._fetch_tmdb_detail(
+                    media_type, tmdb_id, warm_images=False
+                )
                 meta = json.loads(body.decode("utf-8"))
                 meta["_cache"] = cache_status
                 items[tmdb_id] = meta
