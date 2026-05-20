@@ -10,6 +10,7 @@ const categories = [
 const IMAGE_BASE = "/api/image/tmdb/w500";
 const BACKDROP_BASE = "/api/image/tmdb/w1280";
 const STILL_BASE = "/api/image/tmdb/w780";
+const PROFILE_BASE = "/api/image/tmdb/w185";
 const ROUTE_TO_TYPE = {
   filme: "movie",
   serie: "serie",
@@ -264,6 +265,83 @@ function GridRow({ title, eyebrow, status, items, onSelect, hasMore, onMore }) {
   );
 }
 
+function CastCard({ member, onClick }) {
+  const profileUrl = member.profile_path ? `${PROFILE_BASE}${member.profile_path}` : null;
+  return (
+    <button className="cast-card" type="button" onClick={onClick}>
+      <div className="cast-card__photo">
+        {profileUrl
+          ? <img src={profileUrl} alt={member.name} loading="lazy" />
+          : <span className="cast-card__initials">{(member.name || "?").charAt(0)}</span>}
+      </div>
+      <p className="cast-card__name">{member.name}</p>
+      {member.character ? <p className="cast-card__role">{member.character}</p> : null}
+    </button>
+  );
+}
+
+function PersonPanel({ person, data, onClose, onSelectWork }) {
+  const profileUrl = person.profile_path ? `${PROFILE_BASE}${person.profile_path}` : null;
+  const details = data ? data.details : null;
+  const works = data ? data.works : [];
+  const loading = !data;
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div className="person-panel" role="dialog" aria-modal="true" aria-label={person.name}>
+      <div className="person-panel__overlay" onClick={onClose} />
+      <div className="person-panel__content">
+        <button className="person-panel__close" type="button" onClick={onClose} aria-label="Fechar">×</button>
+
+        <div className="person-panel__header">
+          <div className="person-panel__photo">
+            {profileUrl
+              ? <img src={profileUrl} alt={person.name} />
+              : <span className="cast-card__initials">{(person.name || "?").charAt(0)}</span>}
+          </div>
+          <div className="person-panel__meta">
+            <h2 className="person-panel__name">{person.name}</h2>
+            {person.character ? <p className="person-panel__character">{person.character}</p> : null}
+            {details && details.birthday
+              ? <p className="person-panel__info">{details.birthday}{details.place_of_birth ? ` · ${details.place_of_birth}` : ""}</p>
+              : null}
+          </div>
+        </div>
+
+        {details && details.biography
+          ? <p className="person-panel__bio">{details.biography}</p>
+          : null}
+
+        {loading
+          ? <p className="person-panel__loading">Carregando filmografia…</p>
+          : works.length > 0
+            ? (
+              <section className="person-panel__works-section">
+                <h3 className="person-panel__section-title">Filmografia</h3>
+                <div className="detail__related-grid person-panel__works">
+                  {works.map((work) => (
+                    <MediaCard
+                      key={`${work.type}-${work.id}`}
+                      item={work}
+                      meta={work.meta || {}}
+                      onSelect={(item) => { onClose(); onSelectWork(item); }}
+                      compact
+                    />
+                  ))}
+                </div>
+              </section>
+            )
+            : null}
+      </div>
+    </div>
+  );
+}
+
 function CatalogFilters({
   search,
   onSearchChange,
@@ -391,6 +469,9 @@ function App() {
   const [seasonData, setSeasonData] = useState(null);
   const [modalSeasonData, setModalSeasonData] = useState(null);
   const [relatedItems, setRelatedItems] = useState([]);
+  const [castData, setCastData] = useState([]);
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [personData, setPersonData] = useState(null);
 
   useEffect(() => {
     function onRemoteSearch(event) {
@@ -935,6 +1016,38 @@ function App() {
   }, [selected]);
 
   useEffect(() => {
+    if (!selected) { setCastData([]); return; }
+    fetchJson(`/api/tmdb/credits?type=${selected.type}&id=${selected.id}`)
+      .then((data) => setCastData((data.cast || []).slice(0, 20)))
+      .catch(() => setCastData([]));
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selectedPerson) { setPersonData(null); return; }
+    let cancelled = false;
+    Promise.all([
+      fetchJson(`/api/tmdb/person?id=${selectedPerson.id}`),
+      fetchJson(`/api/tmdb/person/credits?id=${selectedPerson.id}`),
+    ]).then(([details, credits]) => {
+      if (cancelled) return;
+      const seen = new Map();
+      [...(credits.cast || []), ...(credits.crew || []).filter((c) => c.job === "Director")]
+        .forEach((item) => { if (!seen.has(item.id)) seen.set(item.id, item); });
+      const works = [...seen.values()]
+        .filter((item) => item.poster_path)
+        .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0))
+        .slice(0, 24)
+        .map((item) => ({
+          id: String(item.id),
+          type: item.media_type === "movie" ? "movie" : (item.genre_ids || []).includes(ANIMATION_GENRE_ID) ? "anime" : "serie",
+          meta: item,
+        }));
+      setPersonData({ details, works });
+    }).catch(() => { if (!cancelled) setPersonData(null); });
+    return () => { cancelled = true; };
+  }, [selectedPerson]);
+
+  useEffect(() => {
     const handlePop = () => {
       const parts = window.location.pathname.split("/").filter(Boolean);
       if (
@@ -1078,6 +1191,28 @@ function App() {
                 </div>
               </div>
 
+              {castData.length > 0 ? (
+                <section className="detail__section">
+                  <div className="detail__section-heading">
+                    <h2 className="detail__section-title">Elenco</h2>
+                  </div>
+                  <div className="cast-scroll">
+                    {castData.map((member) => (
+                      <CastCard
+                        key={member.id}
+                        member={member}
+                        onClick={() => setSelectedPerson({
+                          id: String(member.id),
+                          name: member.name,
+                          character: member.character,
+                          profile_path: member.profile_path,
+                        })}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
               {selected.type !== "movie" ? (
                 <section className="detail__section">
                   <div className="detail__section-heading">
@@ -1180,6 +1315,14 @@ function App() {
         </main>
 
         {renderModal()}
+        {selectedPerson ? (
+          <PersonPanel
+            person={selectedPerson}
+            data={personData}
+            onClose={() => { setSelectedPerson(null); setPersonData(null); }}
+            onSelectWork={openDetail}
+          />
+        ) : null}
       </>
     );
   }
