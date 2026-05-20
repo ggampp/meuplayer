@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="/nav.js"></script>
     <main class="settings-page">
       <header class="settings-page__header">
@@ -51,6 +52,26 @@
           </button>
         </div>
       </form>
+
+      <section class="settings-remote" id="remoteSection">
+        <header class="settings-remote__header">
+          <h2 class="settings-remote__title">Controle Remoto</h2>
+          <p class="settings-remote__lead">
+            Escaneie o QR code com seu celular para controlar o MeuPlayer remotamente —
+            pesquisar, navegar entre seções e trocar canais.
+          </p>
+        </header>
+        <div class="settings-remote__body">
+          <div class="settings-remote__qr" id="remoteQr"></div>
+          <div class="settings-remote__info">
+            <p class="settings-remote__status" id="remoteStatus">Gerando sessão…</p>
+            <p class="settings-remote__url" id="remoteUrl"></p>
+            <button class="btn btn--ghost" id="remoteRefreshBtn" style="margin-top:0.75rem">
+              Renovar sessão
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section class="settings-help">
         <h2 class="settings-help__title">Como obter a chave</h2>
@@ -146,6 +167,61 @@
         loadSettings().catch(() => {
           setStatus("Erro ao carregar configurações.", "error");
         });
+      })();
+
+      // ── Remote control session ───────────────────────────────────
+      (function () {
+        const SESSION_KEY = 'meuplayer_remote_session';
+        const qrEl = document.getElementById('remoteQr');
+        const statusEl = document.getElementById('remoteStatus');
+        const urlEl = document.getElementById('remoteUrl');
+        const refreshBtn = document.getElementById('remoteRefreshBtn');
+        let qrInstance = null;
+
+        function remoteUrl(token) {
+          return window.location.origin + '/remote?session=' + encodeURIComponent(token);
+        }
+
+        function renderQr(token) {
+          const url = remoteUrl(token);
+          qrEl.innerHTML = '';
+          qrInstance = new QRCode(qrEl, {
+            text: url,
+            width: 180,
+            height: 180,
+            colorDark: '#f5c518',
+            colorLight: '#0d0d1a',
+            correctLevel: QRCode.CorrectLevel.M,
+          });
+          statusEl.textContent = 'Sessão ativa — escaneie com o celular';
+          statusEl.className = 'settings-remote__status settings-remote__status--ok';
+          urlEl.textContent = url;
+          window.dispatchEvent(new CustomEvent('meuplayer:remote-session-ready', { detail: { token } }));
+        }
+
+        async function createSession() {
+          statusEl.textContent = 'Gerando sessão…';
+          statusEl.className = 'settings-remote__status';
+          qrEl.innerHTML = '';
+          urlEl.textContent = '';
+          try {
+            const res = await fetch('/api/remote/session', { method: 'POST' });
+            const data = await res.json();
+            localStorage.setItem(SESSION_KEY, data.token);
+            renderQr(data.token);
+          } catch (e) {
+            statusEl.textContent = 'Erro ao gerar sessão.';
+          }
+        }
+
+        const stored = localStorage.getItem(SESSION_KEY);
+        if (stored) {
+          renderQr(stored);
+        } else {
+          createSession();
+        }
+
+        refreshBtn.addEventListener('click', createSession);
       })();
     </script>
   </body>

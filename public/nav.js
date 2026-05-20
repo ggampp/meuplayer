@@ -99,22 +99,7 @@
         display: block;
       }
       .app-nav {
-        flex-wrap: nowrap;
-        gap: var(--space-xs);
-      }
-      .app-nav__filters {
-        flex: 0 1 auto;
-        order: 10;
-        margin-left: auto;
-        justify-content: flex-end;
-      }
-    }
-    @media (max-width: 520px) {
-      .app-nav {
-        padding: 0 var(--space-sm);
-      }
-      .app-nav__logo {
-        margin-right: var(--space-2xs);
+        padding: var(--space-2xs) var(--space-sm) var(--space-xs);
       }
       .app-nav__filters {
         flex: 1 1 100%;
@@ -188,4 +173,53 @@
   } else {
     inject();
   }
+
+  // ── Remote receiver ───────────────────────────────────────────────
+  (function () {
+    const SESSION_KEY = 'meuplayer_remote_session';
+    let evtSource = null;
+
+    function handleCommand(cmd) {
+      const action = String(cmd.action || '');
+      const value = String(cmd.value || '');
+      if (action === 'navigate' && value.startsWith('/')) {
+        window.location.href = value;
+      } else if (action === 'search') {
+        window.dispatchEvent(new CustomEvent('meuplayer:remote-search', { detail: { term: value } }));
+      } else if (action === 'channel_up') {
+        if (typeof window.meuPlayerSelectAdjacentChannel === 'function') {
+          window.meuPlayerSelectAdjacentChannel(-1);
+        }
+      } else if (action === 'channel_down') {
+        if (typeof window.meuPlayerSelectAdjacentChannel === 'function') {
+          window.meuPlayerSelectAdjacentChannel(1);
+        }
+      }
+    }
+
+    function connect(token) {
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      const url = '/api/remote/events?session=' + encodeURIComponent(token);
+      evtSource = new EventSource(url);
+      evtSource.onmessage = function (event) {
+        try { handleCommand(JSON.parse(event.data)); } catch (e) {}
+      };
+      evtSource.onerror = function () {
+        evtSource.close();
+        evtSource = null;
+        setTimeout(function () { connect(token); }, 5000);
+      };
+    }
+
+    const storedToken = localStorage.getItem(SESSION_KEY);
+    if (storedToken) connect(storedToken);
+
+    window.addEventListener('meuplayer:remote-session-ready', function (e) {
+      const token = e.detail && e.detail.token;
+      if (token) {
+        localStorage.setItem(SESSION_KEY, token);
+        connect(token);
+      }
+    });
+  })();
 })();
