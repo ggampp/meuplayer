@@ -1,0 +1,13 @@
+node_modules/
+.git/
+*.sqlite3
+cache.sqlite3-*
+out/
+dist/
+dist-server/
+public/cache/
+android/
+.hallmark/
+*.md
+.env
+.envrc
