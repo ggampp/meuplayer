@@ -446,6 +446,15 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/tmdb/related":
             self._proxy_tmdb_related(parsed.query)
             return
+        if parsed.path == "/api/tmdb/credits":
+            self._proxy_tmdb_credits(parsed.query)
+            return
+        if parsed.path == "/api/tmdb/person":
+            self._proxy_tmdb_person(parsed.query)
+            return
+        if parsed.path == "/api/tmdb/person/credits":
+            self._proxy_tmdb_person_credits(parsed.query)
+            return
         if parsed.path == "/api/guia":
             self._proxy_guia(parsed.query)
             return
@@ -1221,6 +1230,44 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         self._cache_set(cache_key, 200, "application/json; charset=utf-8", body, TTL_GUIA_SECONDS)
         self._send_response(200, "application/json; charset=utf-8", body, cache_status="MISS")
 
+
+    def _proxy_tmdb_credits(self, query):
+        if not self._ensure_tmdb_key():
+            return
+        params = parse_qs(query)
+        media_type = params.get("type", ["movie"])[0]
+        tmdb_id = params.get("id", [""])[0]
+        if not tmdb_id:
+            self._send_json_error(400, "Parâmetro id é obrigatório")
+            return
+        tmdb_media = _tmdb_media_type(media_type)
+        cache_key = f"credits:{tmdb_media}:{tmdb_id}:pt-BR"
+        url = f"{TMDB_BASE}/{tmdb_media}/{tmdb_id}/credits?api_key={get_tmdb_api_key()}&language=pt-BR"
+        self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_DETAILS_SECONDS)
+
+    def _proxy_tmdb_person(self, query):
+        if not self._ensure_tmdb_key():
+            return
+        params = parse_qs(query)
+        person_id = params.get("id", [""])[0]
+        if not person_id:
+            self._send_json_error(400, "Parâmetro id é obrigatório")
+            return
+        cache_key = f"person:{person_id}:pt-BR"
+        url = f"{TMDB_BASE}/person/{person_id}?api_key={get_tmdb_api_key()}&language=pt-BR"
+        self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_DETAILS_SECONDS)
+
+    def _proxy_tmdb_person_credits(self, query):
+        if not self._ensure_tmdb_key():
+            return
+        params = parse_qs(query)
+        person_id = params.get("id", [""])[0]
+        if not person_id:
+            self._send_json_error(400, "Parâmetro id é obrigatório")
+            return
+        cache_key = f"person_credits:{person_id}:pt-BR"
+        url = f"{TMDB_BASE}/person/{person_id}/combined_credits?api_key={get_tmdb_api_key()}&language=pt-BR"
+        self._proxy_tmdb_with_cache(url, cache_key, TTL_TMDB_DETAILS_SECONDS)
 
     def _api_remote_session_create(self):
         token = _remote_session_create()
