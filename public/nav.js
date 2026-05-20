@@ -79,17 +79,42 @@
     .app-nav__filters:empty {
       display: none;
     }
+    .app-nav__mobile-select {
+      display: none;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      color: var(--color-ink);
+      background: var(--color-paper-2);
+      border: 1px solid var(--color-rule);
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      cursor: pointer;
+      min-width: 8rem;
+    }
+    @media (max-width: 640px) {
+      .app-nav__link {
+        display: none;
+      }
+      .app-nav__mobile-select {
+        display: block;
+      }
+      .app-nav {
+        flex-wrap: nowrap;
+        gap: var(--space-xs);
+      }
+      .app-nav__filters {
+        flex: 0 1 auto;
+        order: 10;
+        margin-left: auto;
+        justify-content: flex-end;
+      }
+    }
     @media (max-width: 520px) {
       .app-nav {
         padding: 0 var(--space-sm);
-        gap: 2px;
       }
       .app-nav__logo {
         margin-right: var(--space-2xs);
-      }
-      .app-nav__link {
-        padding: 0.35rem 0.6rem;
-        font-size: 0.78rem;
       }
       .app-nav__filters {
         flex: 1 1 100%;
@@ -122,6 +147,21 @@
   logo.href = '/';
   logo.textContent = 'MeuPlayer';
   nav.appendChild(logo);
+
+  const mobileNav = document.createElement('select');
+  mobileNav.className = 'app-nav__mobile-select';
+  mobileNav.setAttribute('aria-label', 'Navegação');
+  LINKS.forEach(({ label, path: linkPath }) => {
+    const opt = document.createElement('option');
+    opt.value = linkPath;
+    opt.textContent = label;
+    if (isActive(linkPath)) opt.selected = true;
+    mobileNav.appendChild(opt);
+  });
+  mobileNav.addEventListener('change', () => {
+    window.location.href = mobileNav.value;
+  });
+  nav.appendChild(mobileNav);
 
   LINKS.forEach(({ label, path: linkPath }) => {
     const a = document.createElement('a');

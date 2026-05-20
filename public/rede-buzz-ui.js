@@ -70,6 +70,7 @@
     const categorySelect = document.getElementById("channelCategory");
     const filtersEl = document.querySelector(".workbench__filters");
     const favToggleBtn = document.getElementById("toggleFavoriteBtn");
+    const mobileSelect = document.getElementById("channelMobileSelect");
 
     if (categorySelect) {
       const categoryField = categorySelect.closest("label");
@@ -126,6 +127,8 @@
       row.button.scrollIntoView({ block: "nearest" });
       activeIndex = index;
 
+      if (mobileSelect) mobileSelect.value = String(index);
+
       const embedUrl = buildEmbedUrl(channel);
       player.src = embedUrl;
       player.setAttribute("allow", IFRAME_ALLOW);
@@ -172,6 +175,16 @@
       channelRows = [];
       grid.innerHTML = "";
       activeIndex = -1;
+
+      if (mobileSelect) {
+        mobileSelect.innerHTML = "";
+        channelList.forEach((channel, index) => {
+          const opt = document.createElement("option");
+          opt.value = String(index);
+          opt.textContent = channel.nome;
+          mobileSelect.appendChild(opt);
+        });
+      }
 
       if (!channelList.length) {
         status.textContent =
@@ -341,6 +354,13 @@
 
     channelUp.addEventListener("click", () => selectAdjacentChannel(-1));
     channelDown.addEventListener("click", () => selectAdjacentChannel(1));
+
+    if (mobileSelect) {
+      mobileSelect.addEventListener("change", () => {
+        const idx = parseInt(mobileSelect.value, 10);
+        if (!isNaN(idx)) selectChannel(idx);
+      });
+    }
 
     if (mode === "favorites") {
       loadFavorites();
