@@ -1,7 +1,9 @@
 import json
 import mimetypes
 import os
+import queue
 import re
+import secrets
 import sqlite3
 import threading
 from datetime import date
@@ -167,7 +169,42 @@ TTL_RDE_SECONDS = 30 * 60
 TMDB_CACHE = {}
 DB_LOCK = threading.Lock()
 
+REMOTE_SESSIONS = {}
+REMOTE_SESSIONS_LOCK = threading.Lock()
+REMOTE_SESSION_TTL = 4 * 60 * 60  # 4 horas
+
 ANIMATION_GENRE_ID = 16
+
+
+def _remote_cleanup_expired():
+    now = int(time())
+    with REMOTE_SESSIONS_LOCK:
+        expired = [t for t, s in list(REMOTE_SESSIONS.items()) if now - s["created_at"] >= REMOTE_SESSION_TTL]
+        for t in expired:
+            del REMOTE_SESSIONS[t]
+
+
+def _remote_session_create():
+    _remote_cleanup_expired()
+    token = secrets.token_urlsafe(20)
+    with REMOTE_SESSIONS_LOCK:
+        REMOTE_SESSIONS[token] = {
+            "queue": queue.Queue(maxsize=50),
+            "created_at": int(time()),
+        }
+    return token
+
+
+def _remote_session_get(token):
+    token = str(token or "").strip()
+    with REMOTE_SESSIONS_LOCK:
+        session = REMOTE_SESSIONS.get(token)
+    if session and int(time()) - session["created_at"] < REMOTE_SESSION_TTL:
+        return session
+    if session:
+        with REMOTE_SESSIONS_LOCK:
+            REMOTE_SESSIONS.pop(token, None)
+    return None
 
 
 def _tmdb_media_type(app_type):
@@ -430,12 +467,25 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/settings":
             self._api_settings_get()
             return
+        if parsed.path in ("/remote", "/remote/"):
+            self.path = "/remote.html"
+            super().do_GET()
+            return
+        if parsed.path == "/api/remote/events":
+            self._api_remote_events(parsed.query)
+            return
         super().do_GET()
 
     def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path == "/api/settings":
             self._api_settings_post()
+            return
+        if parsed.path == "/api/remote/session":
+            self._api_remote_session_create()
+            return
+        if parsed.path == "/api/remote/command":
+            self._api_remote_command()
             return
         self.send_error(404)
 
@@ -1170,6 +1220,66 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         body = json.dumps(schedule, ensure_ascii=False).encode("utf-8")
         self._cache_set(cache_key, 200, "application/json; charset=utf-8", body, TTL_GUIA_SECONDS)
         self._send_response(200, "application/json; charset=utf-8", body, cache_status="MISS")
+
+
+    def _api_remote_session_create(self):
+        token = _remote_session_create()
+        body = json.dumps({"token": token}, ensure_ascii=False).encode("utf-8")
+        self._send_response(200, "application/json; charset=utf-8", body)
+
+    def _api_remote_events(self, query):
+        params = parse_qs(query)
+        token = params.get("session", [""])[0].strip()
+        session = _remote_session_get(token)
+        if not session:
+            self._send_json_error(404, "Sessão não encontrada ou expirada")
+            return
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+        except Exception:
+            return
+        q = session["queue"]
+        while True:
+            try:
+                cmd = q.get(timeout=25)
+                data = json.dumps(cmd, ensure_ascii=False)
+                msg = f"data: {data}\n\n".encode("utf-8")
+            except queue.Empty:
+                msg = b": ping\n\n"
+            try:
+                self.wfile.write(msg)
+                self.wfile.flush()
+            except Exception:
+                break
+
+    def _api_remote_command(self):
+        try:
+            payload = self._read_json_body(max_bytes=1024)
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._send_json_error(400, "JSON inválido", str(exc))
+            return
+        token = str(payload.get("session") or "").strip()
+        action = str(payload.get("action") or "").strip()
+        value = str(payload.get("value") or "").strip()
+        if not token or not action:
+            self._send_json_error(400, "session e action são obrigatórios")
+            return
+        session = _remote_session_get(token)
+        if not session:
+            self._send_json_error(404, "Sessão não encontrada ou expirada")
+            return
+        try:
+            session["queue"].put_nowait({"action": action, "value": value})
+        except queue.Full:
+            self._send_json_error(429, "Fila cheia, tente novamente")
+            return
+        self._send_response(200, "application/json", b'{"ok":true}')
 
 
 def run():

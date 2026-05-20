@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>MeuPlayer · Controle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,144,400&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --paper: oklch(10% 0.015 250);
+        --paper-2: oklch(15% 0.02 250);
+        --paper-3: oklch(20% 0.02 250);
+        --rule: oklch(28% 0.015 250 / 0.6);
+        --ink: oklch(92% 0.005 250);
+        --ink-2: oklch(70% 0.01 250);
+        --ink-3: oklch(50% 0.01 250);
+        --accent: oklch(76% 0.16 80);
+        --accent-ink: oklch(18% 0.04 80);
+        --accent-soft: oklch(76% 0.16 80 / 0.12);
+        --radius: 12px;
+        --radius-sm: 8px;
+      }
+
+      html, body {
+        height: 100%;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 15px;
+        line-height: 1.45;
+        overscroll-behavior: none;
+      }
+
+      .remote {
+        display: flex;
+        flex-direction: column;
+        min-height: 100dvh;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+
+      /* Header */
+      .remote__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1rem;
+        background: oklch(13% 0.018 250 / 0.95);
+        border-bottom: 1px solid var(--rule);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .remote__logo {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 1.2rem;
+        color: var(--ink);
+      }
+
+      .remote__badge {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--ink-3);
+        letter-spacing: 0.02em;
+      }
+
+      .remote__dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--ink-3);
+        transition: background 0.3s;
+      }
+
+      .remote__dot--ok { background: oklch(72% 0.18 145); }
+      .remote__dot--err { background: oklch(65% 0.2 25); }
+
+      /* Body */
+      .remote__body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      /* Section */
+      .remote__section { display: flex; flex-direction: column; gap: 0.5rem; }
+
+      .remote__label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        padding-left: 0.25rem;
+      }
+
+      /* Navigation grid */
+      .remote__nav-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+      }
+
+      .remote__nav-btn {
+        background: var(--paper-2);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-sm);
+        color: var(--ink-2);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.75rem 0.5rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        text-align: center;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .remote__nav-btn:active,
+      .remote__nav-btn--active {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* Search */
+      .remote__search-row {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .remote__search-input {
+        flex: 1;
+        background: var(--paper-2);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-sm);
+        color: var(--ink);
+        font-family: inherit;
+        font-size: 0.9rem;
+        padding: 0.7rem 0.85rem;
+        outline: none;
+        -webkit-appearance: none;
+        transition: border-color 0.15s;
+      }
+
+      .remote__search-input:focus {
+        border-color: var(--accent);
+      }
+
+      .remote__search-input::placeholder { color: var(--ink-3); }
+
+      .remote__search-btn {
+        background: var(--accent);
+        border: 0;
+        border-radius: var(--radius-sm);
+        color: var(--accent-ink);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.7rem 1rem;
+        cursor: pointer;
+        white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s;
+      }
+
+      .remote__search-btn:active { opacity: 0.8; }
+
+      /* Channel controls */
+      .remote__channel-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+
+      .remote__ch-btn {
+        background: var(--paper-2);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        color: var(--ink-2);
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 500;
+        padding: 1.1rem 0.5rem;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.3rem;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.15s, color 0.15s;
+        user-select: none;
+      }
+
+      .remote__ch-btn:active {
+        background: var(--paper-3);
+        color: var(--ink);
+      }
+
+      .remote__ch-btn__icon { font-size: 1.4rem; line-height: 1; }
+      .remote__ch-btn__label { font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; }
+
+      /* No session */
+      .remote__no-session {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        gap: 0.75rem;
+        text-align: center;
+        padding: 2rem;
+        color: var(--ink-3);
+      }
+
+      .remote__no-session p { font-size: 0.9rem; line-height: 1.6; }
+
+      .remote__flash {
+        position: fixed;
+        inset: 0;
+        background: oklch(76% 0.16 80 / 0.15);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.1s;
+        z-index: 100;
+      }
+      .remote__flash--active { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <div class="remote" id="app">
+      <header class="remote__header">
+        <span class="remote__logo">MeuPlayer</span>
+        <span class="remote__badge">
+          <span class="remote__dot" id="statusDot"></span>
+          <span id="statusText">Conectando…</span>
+        </span>
+      </header>
+      <div class="remote__body" id="remoteBody">
+        <div class="remote__no-session" id="noSession" style="display:none">
+          <p>Sessão não encontrada.<br>Abra as Configurações no MeuPlayer e escaneie o QR code novamente.</p>
+        </div>
+
+        <!-- Navigation -->
+        <section class="remote__section" id="navSection" style="display:none">
+          <p class="remote__label">Navegar para</p>
+          <div class="remote__nav-grid">
+            <button class="remote__nav-btn" data-path="/filme">Filmes</button>
+            <button class="remote__nav-btn" data-path="/serie">Séries</button>
+            <button class="remote__nav-btn" data-path="/anime">Animes</button>
+            <button class="remote__nav-btn" data-path="/canais">Canais</button>
+            <button class="remote__nav-btn" data-path="/rede-buzz">Rede Buzz</button>
+            <button class="remote__nav-btn" data-path="/rede-buzz-favoritos">Favoritos</button>
+          </div>
+        </section>
+
+        <!-- Search -->
+        <section class="remote__section" id="searchSection" style="display:none">
+          <p class="remote__label">Pesquisar</p>
+          <div class="remote__search-row">
+            <input
+              type="search"
+              id="searchInput"
+              class="remote__search-input"
+              placeholder="Título, ID, original…"
+              enterkeyhint="search"
+              autocomplete="off"
+            />
+            <button class="remote__search-btn" id="searchBtn">Buscar</button>
+          </div>
+        </section>
+
+        <!-- Channel controls -->
+        <section class="remote__section" id="channelSection" style="display:none">
+          <p class="remote__label">Canal</p>
+          <div class="remote__channel-grid">
+            <button class="remote__ch-btn" id="chUpBtn">
+              <span class="remote__ch-btn__icon">▲</span>
+              <span class="remote__ch-btn__label">Anterior</span>
+            </button>
+            <button class="remote__ch-btn" id="chDownBtn">
+              <span class="remote__ch-btn__icon">▼</span>
+              <span class="remote__ch-btn__label">Próximo</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="remote__flash" id="flash"></div>
+
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('session') || '';
+
+        const dot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const noSession = document.getElementById('noSession');
+        const navSection = document.getElementById('navSection');
+        const searchSection = document.getElementById('searchSection');
+        const channelSection = document.getElementById('channelSection');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const chUpBtn = document.getElementById('chUpBtn');
+        const chDownBtn = document.getElementById('chDownBtn');
+        const flash = document.getElementById('flash');
+
+        function setStatus(state, text) {
+          statusText.textContent = text;
+          dot.className = 'remote__dot' + (state === 'ok' ? ' remote__dot--ok' : state === 'err' ? ' remote__dot--err' : '');
+        }
+
+        function showFlash() {
+          flash.classList.add('remote__flash--active');
+          setTimeout(() => flash.classList.remove('remote__flash--active'), 120);
+        }
+
+        async function sendCommand(action, value) {
+          showFlash();
+          try {
+            const res = await fetch('/api/remote/command', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session: token, action, value: value || '' }),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              if (res.status === 404) {
+                setStatus('err', 'Sessão expirada');
+              }
+            }
+          } catch (e) {
+            setStatus('err', 'Sem conexão');
+          }
+        }
+
+        if (!token) {
+          noSession.style.display = '';
+          setStatus('err', 'Sem sessão');
+          return;
+        }
+
+        // Show all sections
+        navSection.style.display = '';
+        searchSection.style.display = '';
+        channelSection.style.display = '';
+        setStatus('ok', 'Conectado');
+
+        // Navigation buttons
+        document.querySelectorAll('.remote__nav-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            sendCommand('navigate', btn.dataset.path);
+            document.querySelectorAll('.remote__nav-btn').forEach(function (b) {
+              b.classList.remove('remote__nav-btn--active');
+            });
+            btn.classList.add('remote__nav-btn--active');
+          });
+        });
+
+        // Search
+        function doSearch() {
+          const term = searchInput.value.trim();
+          if (!term) return;
+          sendCommand('search', term);
+        }
+
+        searchBtn.addEventListener('click', doSearch);
+        searchInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+
+        // Channel controls
+        chUpBtn.addEventListener('click', function () { sendCommand('channel_up'); });
+        chDownBtn.addEventListener('click', function () { sendCommand('channel_down'); });
+      })();
+    </script>
+  </body>
+</html>

@@ -393,6 +393,15 @@ function App() {
   const [relatedItems, setRelatedItems] = useState([]);
 
   useEffect(() => {
+    function onRemoteSearch(event) {
+      const term = String(event.detail?.term || '');
+      setSearch(term);
+    }
+    window.addEventListener('meuplayer:remote-search', onRemoteSearch);
+    return () => window.removeEventListener('meuplayer:remote-search', onRemoteSearch);
+  }, []);
+
+  useEffect(() => {
     fetchJson("/api/media/stored?limit=120")
       .then((data) => {
         const items = data.items || [];

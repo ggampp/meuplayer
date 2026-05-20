@@ -1416,6 +1416,77 @@ main {
   gap: var(--space-xs);
 }
 
+.settings-remote {
+  margin-top: var(--space-xl);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.settings-remote__header {
+  margin-bottom: var(--space-md);
+}
+
+.settings-remote__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-2xs);
+  color: var(--color-ink);
+}
+
+.settings-remote__lead {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  line-height: 1.55;
+}
+
+.settings-remote__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.settings-remote__qr {
+  flex-shrink: 0;
+  border-radius: var(--radius-input);
+  overflow: hidden;
+  background: oklch(10% 0.015 250);
+  padding: var(--space-xs);
+}
+
+.settings-remote__qr canvas,
+.settings-remote__qr img {
+  display: block;
+}
+
+.settings-remote__info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.settings-remote__status {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.settings-remote__status--ok {
+  color: oklch(72% 0.18 145);
+}
+
+.settings-remote__url {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+  word-break: break-all;
+  max-width: 28rem;
+}
+
 .settings-help {
   margin-top: var(--space-xl);
   padding: var(--space-lg);
