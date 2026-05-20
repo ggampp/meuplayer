@@ -4,7 +4,6 @@ import os
 import queue
 import re
 import secrets
-import sqlite3
 import threading
 from datetime import date
 from html.parser import HTMLParser
@@ -12,6 +11,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from time import time
 from urllib.parse import urlencode, urlparse, parse_qs, quote_plus, unquote
 from urllib.request import Request, urlopen
+
+from cache_db import create_cache_database
 
 def load_env(path):
     if not os.path.exists(path):
@@ -177,7 +178,7 @@ def mask_tmdb_api_key(key):
 bootstrap_tmdb_api_key()
 
 STATIC_DIR = os.environ.get("MEUPLAYER_STATIC_DIR") or os.path.join(BASE_DIR, "public")
-DB_PATH = os.path.join(user_data_dir(), "cache.sqlite3")
+SQLITE_CACHE_PATH = os.path.join(user_data_dir(), "cache.sqlite3")
 IMAGE_CACHE_DIR = os.path.join(STATIC_DIR, "cache", "images", "tmdb")
 
 TTL_GUIA_SECONDS = 30 * 60
@@ -252,65 +253,15 @@ def _is_animation_tv(meta):
     return ANIMATION_GENRE_ID in genre_ids
 
 
-def _connect_cache_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS api_cache (
-            cache_key TEXT PRIMARY KEY,
-            status INTEGER NOT NULL,
-            content_type TEXT NOT NULL,
-            body BLOB NOT NULL,
-            expires_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS media_metadata (
-            media_key TEXT PRIMARY KEY,
-            media_type TEXT NOT NULL,
-            tmdb_id TEXT NOT NULL,
-            body BLOB NOT NULL,
-            updated_at INTEGER NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    return conn
-
-
 def _media_metadata_get(media_key):
     with DB_LOCK:
-        row = DB_CONN.execute(
-            """
-            SELECT body FROM media_metadata WHERE media_key = ?
-            """,
-            (media_key,),
-        ).fetchone()
-    if not row:
-        return None
-    return row[0]
+        return CACHE_DB.media_metadata_get(media_key)
 
 
 def _media_metadata_set(media_key, media_type, tmdb_id, body):
     now = int(time())
     with DB_LOCK:
-        DB_CONN.execute(
-            """
-            INSERT INTO media_metadata (media_key, media_type, tmdb_id, body, updated_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(media_key) DO UPDATE SET
-                media_type = excluded.media_type,
-                tmdb_id = excluded.tmdb_id,
-                body = excluded.body,
-                updated_at = excluded.updated_at
-            """,
-            (media_key, media_type, tmdb_id, body, now),
-        )
-        DB_CONN.commit()
+        CACHE_DB.media_metadata_set(media_key, media_type, tmdb_id, body, now)
 
 
 def _warm_tmdb_images(meta):
@@ -344,8 +295,13 @@ def _warm_tmdb_images(meta):
 
 os.makedirs(user_data_dir(), exist_ok=True)
 os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
-DB_CONN = _connect_cache_db()
-os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
+try:
+    CACHE_DB = create_cache_database(SQLITE_CACHE_PATH)
+except ValueError as exc:
+    raise SystemExit(str(exc)) from exc
+except RuntimeError as exc:
+    raise SystemExit(str(exc)) from exc
+print(f"[meuplayer] cache: {CACHE_DB.backend}", flush=True)
 
 ALLOWED_IMAGE_SIZES = {
     "w45",
@@ -773,14 +729,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             return payload
 
         with DB_LOCK:
-            row = DB_CONN.execute(
-                """
-                SELECT status, content_type, body, expires_at
-                FROM api_cache
-                WHERE cache_key = ?
-                """,
-                (cache_key,),
-            ).fetchone()
+            row = CACHE_DB.api_cache_get(cache_key)
 
         if not row:
             return None
@@ -788,8 +737,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         status, content_type, body, expires_at = row
         if expires_at <= now:
             with DB_LOCK:
-                DB_CONN.execute("DELETE FROM api_cache WHERE cache_key = ?", (cache_key,))
-                DB_CONN.commit()
+                CACHE_DB.api_cache_delete(cache_key)
             TMDB_CACHE.pop(cache_key, None)
             return None
 
@@ -798,7 +746,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             "content_type": content_type,
             "body": body,
             "expires": expires_at,
-            "cache_source": "sqlite",
+            "cache_source": CACHE_DB.backend,
         }
         TMDB_CACHE[cache_key] = payload
         return payload
@@ -814,20 +762,9 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         }
         TMDB_CACHE[cache_key] = payload
         with DB_LOCK:
-            DB_CONN.execute(
-                """
-                INSERT INTO api_cache (cache_key, status, content_type, body, expires_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(cache_key) DO UPDATE SET
-                    status = excluded.status,
-                    content_type = excluded.content_type,
-                    body = excluded.body,
-                    expires_at = excluded.expires_at,
-                    updated_at = excluded.updated_at
-                """,
-                (cache_key, status, content_type, body, expires_at, now),
+            CACHE_DB.api_cache_set(
+                cache_key, status, content_type, body, expires_at, now
             )
-            DB_CONN.commit()
 
     def _proxy_tmdb_with_cache(self, url, cache_key, ttl_seconds):
         cached = self._cache_get(cache_key)
@@ -960,15 +897,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
         params = parse_qs(query)
         limit = min(int(params.get("limit", ["200"])[0] or 200), 500)
         with DB_LOCK:
-            rows = DB_CONN.execute(
-                """
-                SELECT media_key, media_type, tmdb_id, body, updated_at
-                FROM media_metadata
-                ORDER BY updated_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+            rows = CACHE_DB.media_metadata_list(limit)
 
         items = []
         for media_key, media_type, tmdb_id, body, updated_at in rows:

@@ -5,7 +5,7 @@ MeuPlayer e um aplicativo desktop de catalogo e player feito com Electron, um se
 ## Recursos
 
 - Catalogo de filmes, series e animes com dados da API SuperFlix e metadados do TMDB.
-- Cache persistente local de metadados TMDB e imagens ja consultadas (SQLite + disco).
+- Cache persistente de metadados TMDB e imagens (SQLite ou PostgreSQL + disco para imagens).
 - Player embutido para filmes, series e animes.
 - Aba `Canais` com canais ao vivo carregados a partir de `public/canais.json`.
 - Aba `Rede Buzz` com canais da API [Rei dos Embeds](https://reidosembeds.com/doc) (embed `rde.buzz`).
@@ -21,7 +21,7 @@ MeuPlayer e um aplicativo desktop de catalogo e player feito com Electron, um se
 - Electron
 - Python `http.server`
 - React 18 via CDN na interface principal
-- SQLite para cache local de API
+- SQLite ou PostgreSQL para cache de API (configurável via `.env`)
 - Electron Builder + PyInstaller (servidor embutido no `.exe`)
 
 ## Como Rodar
@@ -50,9 +50,26 @@ Em desenvolvimento, o servidor também aceita `.env` na raiz do projeto:
 
 ```env
 TMDB_API_KEY=sua_chave_tmdb
+
+# Opcional — PostgreSQL (VPS ou local). Omita para usar SQLite.
+# CACHE_DATABASE_URL=postgresql://usuario:senha@localhost:5432/meuplayer
 ```
 
 Sem chave, detalhes, busca, gêneros e imagens do TMDB ficam limitados.
+
+### Cache PostgreSQL (opcional)
+
+Por padrão o cache fica em SQLite (`cache.sqlite3` na pasta de dados do app). Para usar Postgres:
+
+1. Instale o driver: `pip install -r requirements.txt`
+2. Defina `CACHE_DATABASE_URL` no `.env` (veja `.env.example`)
+3. **Local:** `docker compose -f docker-compose.postgres.yml up -d` cria um Postgres em `localhost:5432`
+4. **VPS:** use a connection string do Postgres já existente no `.env` do deploy
+5. Migração do SQLite antigo: `python scripts/migrate-cache-sqlite-to-postgres.py`
+
+As **imagens** TMDB continuam em disco (`public/cache/images/tmdb`); só respostas de API e metadados vão para o banco.
+
+No log do servidor aparece `[meuplayer] cache: sqlite` ou `cache: postgres`.
 
 ## Scripts
 
@@ -77,7 +94,8 @@ O build do Windows **não exige Python instalado** na máquina do usuário: o `m
 - `public/rede-buzz-store.js` / `public/rede-buzz-ui.js`: favoritos e UI compartilhada das abas Buzz.
 - `public/canais.json`: lista de canais e URLs dos players.
 - `public/nav.js`: navegacao comum do app.
-- `cache.sqlite3`: cache local do projeto.
+- `cache.sqlite3`: cache SQLite (quando `CACHE_DATABASE_URL` não está definida).
+- `cache_db.py`: camada SQLite/PostgreSQL do cache.
 
 ## Canais
 

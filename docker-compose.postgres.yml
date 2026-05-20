@@ -1,0 +1,19 @@
+# Postgres local para desenvolvimento (opcional)
+# Suba: docker compose -f docker-compose.postgres.yml up -d
+# .env: CACHE_DATABASE_URL=postgresql://meuplayer:meuplayer@localhost:5432/meuplayer
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: meuplayer
+      POSTGRES_PASSWORD: meuplayer
+      POSTGRES_DB: meuplayer
+    ports:
+      - "5432:5432"
+    volumes:
+      - meuplayer_pgdata:/var/lib/postgresql/data
+
+volumes:
+  meuplayer_pgdata:

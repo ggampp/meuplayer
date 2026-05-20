@@ -1,0 +1,2 @@
+# Opcional: só necessário quando CACHE_DATABASE_URL aponta para PostgreSQL
+psycopg2-binary>=2.9.9

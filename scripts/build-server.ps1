@@ -19,7 +19,7 @@ python -m PyInstaller `
     --workpath build-server `
     --specpath build-server `
     --clean `
-    server.py
+    server.py cache_db.py
 
 if (-not (Test-Path "dist-server\meuplayer-server.exe")) {
     Write-Error "Build falhou: dist-server\meuplayer-server.exe não foi criado."

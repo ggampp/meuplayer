@@ -294,65 +294,118 @@ function CastCard({ member, onClick }) {
   );
 }
 
-function PersonPanel({ person, data, onClose, onSelectWork }) {
-  const profileUrl = person.profile_path ? `${PROFILE_BASE}${person.profile_path}` : null;
+function formatPersonMeta(details) {
+  if (!details) return [];
+  const lines = [];
+  if (details.birthday) {
+    const born = details.deathday
+      ? `${details.birthday} — ${details.deathday}`
+      : details.birthday;
+    lines.push(`Nascimento: ${born}`);
+  }
+  if (details.place_of_birth) lines.push(details.place_of_birth);
+  if (details.known_for_department) lines.push(details.known_for_department);
+  return lines;
+}
+
+function KnownForCard({ work, onSelect }) {
+  const meta = work.meta || {};
+  const title = meta.title || meta.name || work.id;
+  const posterUrl = meta.poster_path ? `${IMAGE_BASE}${meta.poster_path}` : null;
+  const role = meta.character || meta.job || null;
+  return (
+    <button type="button" className="known-for-card" onClick={() => onSelect(work)}>
+      <div className="known-for-card__poster">
+        {posterUrl
+          ? <img src={posterUrl} alt={title} loading="lazy" />
+          : <span className="cast-card__initials">{(title || "?").charAt(0)}</span>}
+      </div>
+      <p className="known-for-card__title">{title}</p>
+      {role ? <p className="known-for-card__role">{role}</p> : null}
+    </button>
+  );
+}
+
+function PersonDetail({ person, data, hasParentDetail, onBack, onSelectWork }) {
+  const profileUrl = person.profile_path ? `${IMAGE_BASE}${person.profile_path}` : null;
   const details = data ? data.details : null;
   const works = data ? data.works : [];
   const loading = !data;
+  const metaLines = formatPersonMeta(details);
+  const biography = details?.biography?.trim() || "";
 
-  React.useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [person.id]);
 
   return (
-    <div className="person-panel" role="dialog" aria-modal="true" aria-label={person.name}>
-      <div className="person-panel__overlay" onClick={onClose} />
-      <div className="person-panel__content">
-        <button className="person-panel__close" type="button" onClick={onClose} aria-label="Fechar">×</button>
+    <main>
+      <article className="detail detail--person">
+        <div className="detail__content">
+          <button type="button" className="detail__back" onClick={onBack}>
+            {hasParentDetail ? "← Voltar ao título" : "← Voltar ao catálogo"}
+          </button>
 
-        <div className="person-panel__header">
-          <div className="person-panel__photo">
-            {profileUrl
-              ? <img src={profileUrl} alt={person.name} />
-              : <span className="cast-card__initials">{(person.name || "?").charAt(0)}</span>}
-          </div>
-          <div className="person-panel__meta">
-            <h2 className="person-panel__name">{person.name}</h2>
-            {person.character ? <p className="person-panel__character">{person.character}</p> : null}
-            {details && details.birthday
-              ? <p className="person-panel__info">{details.birthday}{details.place_of_birth ? ` · ${details.place_of_birth}` : ""}</p>
-              : null}
-          </div>
-        </div>
+          <div className="detail__layout">
+            <div
+              className="detail__poster detail__poster--profile"
+              style={profileUrl ? { backgroundImage: `url(${profileUrl})` } : undefined}
+            >
+              {!profileUrl ? (
+                <span className="cast-card__initials">{(person.name || "?").charAt(0)}</span>
+              ) : null}
+            </div>
 
-        {details && details.biography
-          ? <p className="person-panel__bio">{details.biography}</p>
-          : null}
+            <div className="detail__info detail__info--person">
+              <h1 className="detail__title">{person.name}</h1>
+              {person.character ? (
+                <p className="detail__subtitle">Como {person.character}</p>
+              ) : null}
 
-        {loading
-          ? <p className="person-panel__loading">Carregando filmografia…</p>
-          : works.length > 0
-            ? (
-              <section className="person-panel__works-section">
-                <h3 className="person-panel__section-title">Filmografia</h3>
-                <div className="detail__related-grid person-panel__works">
-                  {works.map((work) => (
-                    <MediaCard
-                      key={`${work.type}-${work.id}`}
-                      item={work}
-                      meta={work.meta || {}}
-                      onSelect={(item) => { onClose(); onSelectWork(item); }}
-                      compact
-                    />
+              {metaLines.length ? (
+                <div className="detail__meta detail__meta--stacked">
+                  {metaLines.map((line) => (
+                    <span key={line}>{line}</span>
                   ))}
                 </div>
-              </section>
-            )
-            : null}
-      </div>
-    </div>
+              ) : null}
+
+              <div className="detail__bio-block">
+                <h2 className="detail__bio-heading">Biografia</h2>
+                {loading ? (
+                  <p className="detail__overview">Carregando biografia…</p>
+                ) : (
+                  <p className="detail__overview">
+                    {biography || "Biografia não disponível."}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <section className="detail__section">
+            <div className="detail__section-heading">
+              <h2 className="detail__section-title">Conhecido(a) por</h2>
+            </div>
+            {loading ? (
+              <p className="detail__section-status">Carregando obras…</p>
+            ) : works.length ? (
+              <div className="known-for-scroll">
+                {works.map((work) => (
+                  <KnownForCard
+                    key={`${work.type}-${work.id}`}
+                    work={work}
+                    onSelect={onSelectWork}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="detail__section-status">Nenhuma obra com capa encontrada.</p>
+            )}
+          </section>
+        </div>
+      </article>
+    </main>
   );
 }
 
@@ -1005,6 +1058,16 @@ function App() {
     syncUrl(null, true);
   };
 
+  const closePerson = () => {
+    setSelectedPerson(null);
+    setPersonData(null);
+  };
+
+  const openWorkFromPerson = (item) => {
+    closePerson();
+    openDetail(item);
+  };
+
   useEffect(() => {
     if (!selected || selected.type === "movie") {
       setSeasonNumber("1");
@@ -1195,6 +1258,21 @@ function App() {
       }));
     }
   };
+
+  if (selectedPerson) {
+    return (
+      <>
+        <PersonDetail
+          person={selectedPerson}
+          data={personData}
+          hasParentDetail={Boolean(selected)}
+          onBack={closePerson}
+          onSelectWork={openWorkFromPerson}
+        />
+        {renderModal()}
+      </>
+    );
+  }
 
   if (selected) {
     const title = selectedMeta?.title || selectedMeta?.name || selected.id;
@@ -1416,14 +1494,6 @@ function App() {
         </main>
 
         {renderModal()}
-        {selectedPerson ? (
-          <PersonPanel
-            person={selectedPerson}
-            data={personData}
-            onClose={() => { setSelectedPerson(null); setPersonData(null); }}
-            onSelectWork={openDetail}
-          />
-        ) : null}
       </>
     );
   }
