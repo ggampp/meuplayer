@@ -564,6 +564,7 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             "/filme": "/filme.html",
             "/anime": "/anime.html",
             "/serie": "/serie.html",
+            "/dorama": "/dorama.html",
         }
         for route_prefix, target_file in route_map.items():
             if path == route_prefix or path == f"{route_prefix}/":
@@ -1011,8 +1012,10 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             self._send_json_error(400, "Parâmetro original_language inválido")
             return
 
+        sort_param = params.get("sort", [""])[0].strip().lower()
         tmdb_media = "movie" if media_type == "movie" else "tv"
-        sort_by = "primary_release_date.desc" if tmdb_media == "movie" else "first_air_date.desc"
+        default_sort = "primary_release_date.desc" if tmdb_media == "movie" else "first_air_date.desc"
+        sort_by = {"popularity": "popularity.desc", "vote": "vote_count.desc"}.get(sort_param, default_sort)
         cache_key = f"discover:{tmdb_media}:{sort_by}:{page}:pt-BR"
         if genre_id:
             cache_key += f":genre:{genre_id}"

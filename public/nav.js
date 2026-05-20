@@ -3,13 +3,14 @@
     { label: 'Filmes', path: '/filme' },
     { label: 'Séries', path: '/serie' },
     { label: 'Animes', path: '/anime' },
+    { label: 'Doramas', path: '/dorama' },
     { label: 'Canais', path: '/canais' },
     { label: 'Rede Buzz', path: '/rede-buzz' },
     { label: 'Buzz Favoritos', path: '/rede-buzz-favoritos' },
     { label: 'Configurações', path: '/configuracoes' },
   ];
 
-  const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime']);
+  const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime', '/dorama']);
 
   const style = document.createElement('style');
   style.textContent = `

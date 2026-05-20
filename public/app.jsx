@@ -5,6 +5,7 @@ const categories = [
   { key: "movie", label: "Filmes", eyebrow: "Cinema" },
   { key: "serie", label: "Séries", eyebrow: "Live action" },
   { key: "anime", label: "Animes", eyebrow: "Animação" },
+  { key: "dorama", label: "Doramas", eyebrow: "K-Drama", dedicated: true },
 ];
 
 const IMAGE_BASE = "/api/image/tmdb/w500";
@@ -15,6 +16,7 @@ const ROUTE_TO_TYPE = {
   filme: "movie",
   serie: "serie",
   anime: "anime",
+  dorama: "dorama",
 };
 
 function getRouteTypeFromPath(pathname) {
@@ -27,6 +29,7 @@ const ROUTE_TYPE = window.MEUPLAYER_ROUTE || getRouteTypeFromPath(window.locatio
 function mediaTypeToRoute(type) {
   if (type === "movie") return "filme";
   if (type === "anime") return "anime";
+  if (type === "dorama") return "dorama";
   return "serie";
 }
 
@@ -98,11 +101,11 @@ function isAnimationTv(meta) {
 }
 
 function emptyCatalog() {
-  return { movie: [], serie: [], anime: [] };
+  return { movie: [], serie: [], anime: [], dorama: [] };
 }
 
 function categoriesForTypeFilter(typeFilter) {
-  if (typeFilter === "all") return categories;
+  if (typeFilter === "all") return categories.filter((c) => !c.dedicated);
   return categories.filter((category) => category.key === typeFilter);
 }
 
@@ -152,6 +155,7 @@ function pickYear(meta) {
 function typeLabel(type) {
   if (type === "movie") return "Filme";
   if (type === "anime") return "Anime";
+  if (type === "dorama") return "Dorama";
   return "Série";
 }
 
@@ -472,6 +476,10 @@ function App() {
   const [castData, setCastData] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [personData, setPersonData] = useState(null);
+  const [doramaItems, setDoramaItems] = useState([]);
+  const [doramaPage, setDoramaPage] = useState(1);
+  const [doramaHasMore, setDoramaHasMore] = useState(false);
+  const [doramaLoading, setDoramaLoading] = useState(false);
 
   useEffect(() => {
     function onRemoteSearch(event) {
@@ -521,7 +529,43 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (ROUTE_TYPE !== "dorama") return;
+    let active = true;
+    setDoramaLoading(true);
+    fetchJson(
+      `/api/tmdb/discover?type=tv&original_language=ko&sort=popularity&page=${doramaPage}`
+    )
+      .then((data) => {
+        if (!active) return;
+        const items = (data.results || []).filter(isReleased).map((item) => ({
+          id: String(item.id),
+          type: "dorama",
+          meta: item,
+        }));
+        setDoramaItems((prev) => (doramaPage === 1 ? items : [...prev, ...items]));
+        setDoramaHasMore((data.page || 1) < (data.total_pages || 1));
+        setMetaMap((prev) => {
+          const next = { ...prev };
+          items.forEach((item) => {
+            next[`dorama-${item.id}`] = item.meta;
+          });
+          return next;
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+      })
+      .finally(() => {
+        if (active) setDoramaLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [doramaPage]);
+
+  useEffect(() => {
     if (search.trim().length >= 2) return;
+    if (ROUTE_TYPE === "dorama") return;
 
     let active = true;
 
@@ -608,7 +652,7 @@ function App() {
           fetchJson(`/api/tmdb/search?type=movie&query=${encodeURIComponent(term)}`)
             .then((data) => ({ type: "movie", data }))
         );
-      } else if (typeFilter === "serie" || typeFilter === "anime") {
+      } else if (typeFilter === "serie" || typeFilter === "anime" || typeFilter === "dorama") {
         requests.push(
           fetchJson(`/api/tmdb/search?type=tv&query=${encodeURIComponent(term)}`)
             .then((data) => ({ type: "tv", data }))
@@ -641,13 +685,18 @@ function App() {
                 nextMeta[`movie-${item.id}`] = item;
               });
             } else {
-              const targetType = typeFilter === "anime" ? "anime" : "serie";
-              nextResults[targetType] = items.map((item) => ({
+              const targetType =
+                typeFilter === "anime" ? "anime" : typeFilter === "dorama" ? "dorama" : "serie";
+              const filteredItems =
+                targetType === "dorama"
+                  ? items.filter((item) => item.original_language === "ko")
+                  : items;
+              nextResults[targetType] = filteredItems.map((item) => ({
                 id: String(item.id),
                 type: targetType,
                 meta: item,
               }));
-              items.forEach((item) => {
+              filteredItems.forEach((item) => {
                 nextMeta[`${targetType}-${item.id}`] = item;
               });
             }
@@ -742,7 +791,10 @@ function App() {
 
   const filteredRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    const sourceLists = searchResults || genreResults || lists;
+    const sourceLists =
+      searchResults ||
+      genreResults ||
+      (ROUTE_TYPE === "dorama" ? { ...emptyCatalog(), dorama: doramaItems } : lists);
     const apiCatalog = Boolean(genreResults);
     const visibleCategories = ROUTE_TYPE
       ? categories.filter((category) => category.key === ROUTE_TYPE)
@@ -784,7 +836,7 @@ function App() {
       if (typeFilter !== "all") {
         items = items.filter((item) => item.type === typeFilter);
       }
-      if (genreFilter !== "all" && !apiCatalog) {
+      if (genreFilter !== "all" && !apiCatalog && category.key !== "dorama") {
         const [filterType, filterId] = genreFilter.split(":");
         items = items.filter((item) => {
           const meta = item.meta || {};
@@ -796,19 +848,26 @@ function App() {
           return ids.includes(filterId);
         });
       }
-      items = [...items].sort((a, b) => {
-        const aDate = a.meta?.release_date || a.meta?.first_air_date || "";
-        const bDate = b.meta?.release_date || b.meta?.first_air_date || "";
-        return (Date.parse(bDate) || 0) - (Date.parse(aDate) || 0);
-      });
+      if (category.key !== "dorama") {
+        items = [...items].sort((a, b) => {
+          const aDate = a.meta?.release_date || a.meta?.first_air_date || "";
+          const bDate = b.meta?.release_date || b.meta?.first_air_date || "";
+          return (Date.parse(bDate) || 0) - (Date.parse(aDate) || 0);
+        });
+      }
       const total = items.length;
-      items = items.slice(0, limit);
+      if (category.key !== "dorama") {
+        items = items.slice(0, limit);
+      }
       return {
         key: category.key,
         title: category.label,
         eyebrow: category.eyebrow,
         items,
-        hasMore: total > limit,
+        hasMore:
+          category.key === "dorama"
+            ? !searching && !searchResults && doramaHasMore
+            : total > limit,
       };
     });
   }, [
@@ -820,6 +879,9 @@ function App() {
     searchResults,
     genreResults,
     displayCounts,
+    doramaItems,
+    doramaHasMore,
+    searching,
   ]);
 
   const featured = useMemo(() => {
@@ -837,7 +899,7 @@ function App() {
         label: genre.name,
       }));
     }
-    if (typeFilter === "serie" || typeFilter === "anime") {
+    if (typeFilter === "serie" || typeFilter === "anime" || typeFilter === "dorama") {
       return genres.tv.map((genre) => ({
         value: `tv:${genre.id}`,
         label: genre.name,
@@ -1052,7 +1114,7 @@ function App() {
       const parts = window.location.pathname.split("/").filter(Boolean);
       if (
         parts.length === 2 &&
-        (parts[0] === "filme" || parts[0] === "serie" || parts[0] === "anime")
+        (parts[0] === "filme" || parts[0] === "serie" || parts[0] === "anime" || parts[0] === "dorama")
       ) {
         const id = parts[1];
         const type = ROUTE_TO_TYPE[parts[0]] || "movie";
@@ -1083,16 +1145,21 @@ function App() {
   const rowsLabel = useMemo(() => {
     if (searching) return "Buscando na API...";
     if (loadingCatalog) return "Carregando catálogo...";
+    if (ROUTE_TYPE === "dorama" && doramaLoading && doramaPage === 1) return "Carregando doramas...";
     if (searchResults) return "Resultados da busca";
     if (genreResults) return "Filtro por gênero";
     return status;
-  }, [searching, searchResults, loadingCatalog, genreResults, status]);
+  }, [searching, searchResults, loadingCatalog, genreResults, status, doramaLoading, doramaPage]);
 
   const handleMore = (key) => {
-    setDisplayCounts((prev) => ({
-      ...prev,
-      [key]: (prev[key] || 10) + 10,
-    }));
+    if (key === "dorama") {
+      setDoramaPage((prev) => prev + 1);
+    } else {
+      setDisplayCounts((prev) => ({
+        ...prev,
+        [key]: (prev[key] || 10) + 10,
+      }));
+    }
   };
 
   if (selected) {
