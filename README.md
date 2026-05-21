@@ -71,6 +71,18 @@ As **imagens** TMDB continuam em disco (`public/cache/images/tmdb`); só respost
 
 No log do servidor aparece `[meuplayer] cache: sqlite` ou `cache: postgres`.
 
+#### Deploy na VPS
+
+O `docker-compose.yml` da raiz já está pronto para a VPS: o serviço `app` é
+anexado à rede externa `database_default` (mantida pelo stack `database`), onde
+o hostname `postgres` resolve para o Postgres compartilhado. Também participa
+da rede `edge` para que o Traefik externo publique
+`meuplayer.meusaplicativos.com` com TLS via Let's Encrypt.
+
+Para subir basta preencher o `.env` da VPS com a connection string gerada no
+painel `db.meusaplicativos.com` (apontando para `postgres:5432`) e rodar
+`docker compose up -d`.
+
 ## Scripts
 
 ```powershell
