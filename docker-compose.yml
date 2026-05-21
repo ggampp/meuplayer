@@ -1,0 +1,35 @@
+services:
+  app:
+    build: .
+    container_name: myrender-meuplayer
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8000"
+    volumes:
+      - meuplayer_data:/data
+    networks:
+      - default
+      - edge
+      - database_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=edge"
+      - "traefik.http.routers.myrender-meuplayer.rule=Host(`meuplayer.meusaplicativos.com`)"
+      - "traefik.http.routers.myrender-meuplayer.entrypoints=websecure"
+      - "traefik.http.routers.myrender-meuplayer.tls=true"
+      - "traefik.http.routers.myrender-meuplayer.tls.certresolver=le"
+      - "traefik.http.routers.myrender-meuplayer.service=myrender-meuplayer"
+      - "traefik.http.services.myrender-meuplayer.loadbalancer.server.port=8000"
+
+volumes:
+  meuplayer_data:
+
+networks:
+  default:
+    name: meuplayer_default
+  edge:
+    external: true
+  database_net:
+    name: database_default
+    external: true
