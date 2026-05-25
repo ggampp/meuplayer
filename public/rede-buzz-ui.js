@@ -189,7 +189,7 @@
       if (!channelList.length) {
         status.textContent =
           mode === "favorites"
-            ? "Nenhum favorito. Marque canais na aba Rede Buzz."
+            ? "Nenhum favorito. Marque canais na aba TV."
             : "Nenhum canal encontrado.";
         player.removeAttribute("src");
         if (favToggleBtn) favToggleBtn.hidden = true;
@@ -367,7 +367,7 @@
     } else {
       loadCategories();
       loadChannels().catch(() => {
-        status.textContent = "Erro ao carregar canais da Rede Buzz.";
+        status.textContent = "Erro ao carregar canais da TV.";
       });
     }
   }

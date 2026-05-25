@@ -4,9 +4,8 @@
     { label: 'Séries', path: '/serie' },
     { label: 'Animes', path: '/anime' },
     { label: 'Doramas', path: '/dorama' },
-    { label: 'Canais', path: '/canais' },
-    { label: 'Rede Buzz', path: '/rede-buzz' },
-    { label: 'Buzz Favoritos', path: '/rede-buzz-favoritos' },
+    { label: 'TV', path: '/rede-buzz' },
+    { label: 'TV Favoritos', path: '/rede-buzz-favoritos' },
     { label: 'Configurações', path: '/configuracoes' },
   ];
 
@@ -72,9 +71,9 @@
       display: flex;
       align-items: center;
       gap: var(--space-xs);
-      flex: 1 1 280px;
-      justify-content: flex-end;
-      margin-left: auto;
+      flex: 0 0 auto;
+      justify-content: flex-start;
+      margin-left: 0;
       min-width: 0;
     }
     .app-nav__filters:empty {
@@ -106,6 +105,7 @@
         flex: 1 1 100%;
         order: 10;
         margin-left: 0;
+        margin-right: 0;
         justify-content: stretch;
       }
     }
@@ -149,14 +149,6 @@
   });
   nav.appendChild(mobileNav);
 
-  LINKS.forEach(({ label, path: linkPath }) => {
-    const a = document.createElement('a');
-    a.className = 'app-nav__link' + (isActive(linkPath) ? ' app-nav__link--active' : '');
-    a.href = linkPath;
-    a.textContent = label;
-    nav.appendChild(a);
-  });
-
   if (isCatalogListPage()) {
     const filtersSlot = document.createElement('div');
     filtersSlot.id = 'catalogFilters';
@@ -164,6 +156,14 @@
     filtersSlot.setAttribute('aria-label', 'Filtros do catálogo');
     nav.appendChild(filtersSlot);
   }
+
+  LINKS.forEach(({ label, path: linkPath }) => {
+    const a = document.createElement('a');
+    a.className = 'app-nav__link' + (isActive(linkPath) ? ' app-nav__link--active' : '');
+    a.href = linkPath;
+    a.textContent = label;
+    nav.appendChild(a);
+  });
 
   function inject() {
     document.body.insertBefore(nav, document.body.firstChild);

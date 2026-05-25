@@ -127,7 +127,7 @@ function buildDiscoverParams(apiType, { genreId, page = "1" } = {}) {
 
 function applyDiscoverItems(nextResults, nextMeta, items, options = {}) {
   const { onlyType, tvAs } = options;
-  items.filter(isReleased).forEach((item) => {
+  items.filter(isVisibleMedia).forEach((item) => {
     const id = String(item.id);
     let type = "movie";
     if (item.media_type === "tv" || tvAs) {
@@ -156,6 +156,29 @@ function isReleased(meta) {
   const parsed = Date.parse(dateText);
   if (!parsed) return true;
   return parsed <= Date.now();
+}
+
+function isAdultMedia(meta) {
+  if (!meta) return false;
+  if (meta.adult === true) return true;
+  const text = [
+    meta.title,
+    meta.name,
+    meta.original_title,
+    meta.original_name,
+    meta.overview,
+    meta.tagline,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return /\b(porn|porno|xxx|erotic|erotico|softcore|hardcore)\b/.test(text);
+}
+
+function isVisibleMedia(meta) {
+  return isReleased(meta) && !isAdultMedia(meta);
 }
 
 function pickYear(meta) {
@@ -409,6 +432,52 @@ function PersonDetail({ person, data, hasParentDetail, onBack, onSelectWork }) {
   );
 }
 
+const NETWORK_OPTIONS = [
+  { value: "netflix", label: "Netflix", match: ["netflix"] },
+  { value: "prime", label: "Prime Video", match: ["amazon", "prime video"] },
+  { value: "hbo", label: "HBO / Max", match: ["hbo", "max original", "warner"] },
+  { value: "disney", label: "Disney+", match: ["disney", "star+", "hulu"] },
+  { value: "apple", label: "Apple TV+", match: ["apple"] },
+  { value: "globoplay", label: "Globoplay", match: ["globo"] },
+  { value: "paramount", label: "Paramount+", match: ["paramount"] },
+];
+
+function itemMatchesNetwork(meta, networkValue) {
+  if (!networkValue || networkValue === "all") return true;
+  const option = NETWORK_OPTIONS.find((opt) => opt.value === networkValue);
+  if (!option) return true;
+  const sources = [
+    ...(meta?.networks || []),
+    ...(meta?.production_companies || []),
+    ...(meta?.watch_providers || []),
+  ];
+  if (!sources.length) return false;
+  const names = sources
+    .map((src) => String(src?.name || "").toLowerCase())
+    .filter(Boolean);
+  return names.some((name) => option.match.some((needle) => name.includes(needle)));
+}
+
+function itemMatchesStatus(meta, type, statusValue) {
+  if (!statusValue || statusValue === "all") return true;
+  const status = String(meta?.status || "").toLowerCase();
+  const isMovie = type === "movie";
+  const finished = isMovie
+    ? status === "released" || (!status && meta?.release_date)
+    : ["ended", "canceled", "cancelled"].includes(status);
+  if (statusValue === "finished") return finished;
+  if (statusValue === "ongoing") return !finished;
+  return true;
+}
+
+function itemMatchesYear(meta, yearValue) {
+  if (!yearValue) return true;
+  const year = String(yearValue).trim();
+  if (!year) return true;
+  const date = meta?.release_date || meta?.first_air_date || "";
+  return date.startsWith(year);
+}
+
 function CatalogFilters({
   search,
   onSearchChange,
@@ -416,42 +485,152 @@ function CatalogFilters({
   onGenreChange,
   genreOptions,
   status,
+  yearFilter,
+  onYearChange,
+  statusFilter,
+  onStatusChange,
+  networkFilter,
+  onNetworkChange,
+  onClear,
+  panelOpen,
+  onTogglePanel,
 }) {
   const slot = document.getElementById("catalogFilters");
-  if (!slot) return null;
 
-  return ReactDOM.createPortal(
-    <div className="app-nav__filters-inner">
-      <span className="app-nav__catalog-status" aria-live="polite">
-        {status}
-      </span>
-      <label className="filters__field filters__field--search">
-        <span className="visually-hidden">Buscar</span>
-        <input
-          type="search"
-          placeholder="Título, ID, original"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          aria-label="Buscar por título, ID ou título original"
-        />
-      </label>
-      <label className="filters__field filters__field--genre">
-        <span className="visually-hidden">Gênero</span>
-        <select
-          value={genreFilter}
-          onChange={(event) => onGenreChange(event.target.value)}
-          aria-label="Filtrar por gênero"
-        >
-          <option value="all">Todos os gêneros</option>
-          {genreOptions.map((genre) => (
-            <option key={genre.value} value={genre.value}>
-              {genre.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>,
-    slot
+  const activeCount =
+    (search.trim() ? 1 : 0) +
+    (genreFilter !== "all" ? 1 : 0) +
+    (yearFilter ? 1 : 0) +
+    (statusFilter !== "all" ? 1 : 0) +
+    (networkFilter !== "all" ? 1 : 0);
+
+  return (
+    <>
+      {slot ? ReactDOM.createPortal(
+        <div className="app-nav__filters-inner">
+          <button
+            type="button"
+            className={`filter-toggle${panelOpen ? " filter-toggle--open" : ""}`}
+            onClick={onTogglePanel}
+            aria-expanded={panelOpen}
+            aria-controls="filterPanel"
+          >
+            <span className="filter-toggle__icon" aria-hidden="true">☰</span>
+            <span>Filtros</span>
+            {activeCount > 0 ? (
+              <span className="filter-toggle__badge">{activeCount}</span>
+            ) : null}
+          </button>
+        </div>,
+        slot
+      ) : null}
+      <aside
+        id="filterPanel"
+        className={`filter-panel${panelOpen ? " filter-panel--open" : ""}`}
+        aria-hidden={!panelOpen}
+        aria-label="Filtros do catálogo"
+      >
+        <div className="filter-panel__overlay" onClick={onTogglePanel} />
+        <div className="filter-panel__drawer" role="dialog" aria-modal="true">
+          <div className="filter-panel__header">
+            <h2 className="filter-panel__title">Filtros</h2>
+            <button
+              type="button"
+              className="filter-panel__close"
+              onClick={onTogglePanel}
+              aria-label="Fechar filtros"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="filter-panel__body">
+            <label className="filters__field">
+              <span>Nome</span>
+              <input
+                type="search"
+                placeholder="Título, ID, original"
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+              />
+            </label>
+
+            <label className="filters__field">
+              <span>Ano de lançamento</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="1900"
+                max="2100"
+                placeholder="Ex.: 2024"
+                value={yearFilter}
+                onChange={(event) => onYearChange(event.target.value)}
+              />
+            </label>
+
+            <label className="filters__field">
+              <span>Situação</span>
+              <select
+                value={statusFilter}
+                onChange={(event) => onStatusChange(event.target.value)}
+              >
+                <option value="all">Todas</option>
+                <option value="finished">Finalizada</option>
+                <option value="ongoing">Em andamento</option>
+              </select>
+            </label>
+
+            <label className="filters__field">
+              <span>Emissora</span>
+              <select
+                value={networkFilter}
+                onChange={(event) => onNetworkChange(event.target.value)}
+              >
+                <option value="all">Todas</option>
+                {NETWORK_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filters__field">
+              <span>Gênero</span>
+              <select
+                value={genreFilter}
+                onChange={(event) => onGenreChange(event.target.value)}
+              >
+                <option value="all">Todos os gêneros</option>
+                {genreOptions.map((genre) => (
+                  <option key={genre.value} value={genre.value}>
+                    {genre.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="filter-panel__footer">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={onClear}
+              disabled={activeCount === 0}
+            >
+              Limpar filtros
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={onTogglePanel}
+            >
+              Aplicar
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -516,6 +695,10 @@ function App() {
   const [status, setStatus] = useState("Carregando...");
   const [search, setSearch] = useState("");
   const [genreFilter, setGenreFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [networkFilter, setNetworkFilter] = useState("all");
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [genres, setGenres] = useState({ movie: [], tv: [] });
   const [searchResults, setSearchResults] = useState(null);
   const [genreResults, setGenreResults] = useState(null);
@@ -529,6 +712,7 @@ function App() {
   const [modal, setModal] = useState({ open: false, id: "", type: "movie" });
   const [modalSeason, setModalSeason] = useState("1");
   const [modalEpisode, setModalEpisode] = useState("1");
+  const [modalChromeVisible, setModalChromeVisible] = useState(true);
   const [playerProvider, setPlayerProvider] = useState("superflix");
   const [metaMap, setMetaMap] = useState({});
   const [selected, setSelected] = useState(null);
@@ -545,10 +729,53 @@ function App() {
   const [doramaLoading, setDoramaLoading] = useState(false);
   const [tmdbConfigured, setTmdbConfigured] = useState(null);
   const metaMapRef = useRef({});
+  const modalChromeTimerRef = useRef(null);
 
   useEffect(() => {
     metaMapRef.current = metaMap;
   }, [metaMap]);
+
+  useEffect(() => {
+    document.body.classList.toggle("filters-open", filterPanelOpen);
+    return () => document.body.classList.remove("filters-open");
+  }, [filterPanelOpen]);
+
+  const hideModalChromeSoon = (delay = 3200) => {
+    if (modalChromeTimerRef.current) {
+      clearTimeout(modalChromeTimerRef.current);
+    }
+    modalChromeTimerRef.current = setTimeout(() => {
+      setModalChromeVisible(false);
+    }, delay);
+  };
+
+  const revealModalChrome = () => {
+    setModalChromeVisible(true);
+    hideModalChromeSoon();
+  };
+
+  const keepModalChromeVisible = () => {
+    if (modalChromeTimerRef.current) {
+      clearTimeout(modalChromeTimerRef.current);
+    }
+    setModalChromeVisible(true);
+  };
+
+  useEffect(() => {
+    if (!modal.open) {
+      if (modalChromeTimerRef.current) {
+        clearTimeout(modalChromeTimerRef.current);
+      }
+      setModalChromeVisible(true);
+      return;
+    }
+    revealModalChrome();
+    return () => {
+      if (modalChromeTimerRef.current) {
+        clearTimeout(modalChromeTimerRef.current);
+      }
+    };
+  }, [modal.open, modal.id, modal.type]);
 
   useEffect(() => {
     fetchJson("/api/settings")
@@ -612,7 +839,7 @@ function App() {
     )
       .then((data) => {
         if (!active) return;
-        const items = (data.results || []).filter(isReleased).map((item) => ({
+        const items = (data.results || []).filter(isVisibleMedia).map((item) => ({
           id: String(item.id),
           type: "dorama",
           meta: item,
@@ -749,7 +976,7 @@ function App() {
           const nextResults = emptyCatalog();
           const nextMeta = {};
           results.forEach((result) => {
-            const items = (result.data?.results || []).slice(0, 50).filter(isReleased);
+            const items = (result.data?.results || []).slice(0, 50).filter(isVisibleMedia);
             if (result.type === "movie") {
               nextResults.movie = items.map((item) => ({
                 id: String(item.id),
@@ -897,7 +1124,7 @@ function App() {
             meta: metaMap[`${category.key}-${entry}`],
           };
         }) || [];
-      items = items.filter((item) => isReleased(item.meta));
+      items = items.filter((item) => isVisibleMedia(item.meta));
       const limit = displayCounts[category.key] || 10;
       if (normalized && !searchResults) {
         items = items.filter((item) => {
@@ -931,6 +1158,19 @@ function App() {
           );
           return ids.includes(filterId);
         });
+      }
+      if (yearFilter) {
+        items = items.filter((item) => itemMatchesYear(item.meta, yearFilter));
+      }
+      if (statusFilter !== "all") {
+        items = items.filter((item) =>
+          itemMatchesStatus(item.meta, item.type, statusFilter)
+        );
+      }
+      if (networkFilter !== "all") {
+        items = items.filter((item) =>
+          itemMatchesNetwork(item.meta, networkFilter)
+        );
       }
       if (category.key !== "dorama") {
         items = [...items].sort((a, b) => {
@@ -966,6 +1206,9 @@ function App() {
     doramaItems,
     doramaHasMore,
     searching,
+    yearFilter,
+    statusFilter,
+    networkFilter,
   ]);
 
   const featured = useMemo(() => {
@@ -1259,6 +1502,10 @@ function App() {
     }
   };
 
+  if (modal.open) {
+    return renderModal();
+  }
+
   if (selectedPerson) {
     return (
       <>
@@ -1501,8 +1748,12 @@ function App() {
   function renderModal() {
     return (
       <div
-        className={`modal ${modal.open ? "is-open" : ""}`}
+        className={`modal ${modal.open ? "is-open" : ""} ${modalChromeVisible ? "modal--chrome-visible" : ""}`}
         aria-hidden={!modal.open}
+        onMouseMove={modal.open ? revealModalChrome : undefined}
+        onPointerMove={modal.open ? revealModalChrome : undefined}
+        onFocusCapture={keepModalChromeVisible}
+        onBlurCapture={() => hideModalChromeSoon(1200)}
       >
         <div className="modal__overlay" onClick={closeModal}></div>
         <div className="modal__content" role="dialog" aria-label="Player de mídia">
@@ -1511,12 +1762,9 @@ function App() {
               <h3 className="modal__title">
                 Player · {typeLabel(modal.type === "movie" ? "movie" : "serie")}
               </h3>
-              <p className="modal__meta">
-                {playerUrl ? playerUrl : "Informe um ID válido."}
-              </p>
             </div>
             <button type="button" className="modal__close" onClick={closeModal}>
-              ×
+              ← Voltar ao catálogo
             </button>
           </div>
           <div className="modal__controls">
@@ -1562,7 +1810,10 @@ function App() {
                 <select
                   id="modalSeason"
                   value={modalSeason}
-                  onChange={(event) => setModalSeason(event.target.value)}
+                  onChange={(event) => {
+                    setModalSeason(event.target.value);
+                    setModalEpisode("1");
+                  }}
                   disabled={!modalSeasonList.length}
                 >
                   {!modalSeasonList.length ? (
@@ -1583,7 +1834,10 @@ function App() {
                   type="number"
                   min="1"
                   value={modalSeason}
-                  onChange={(event) => setModalSeason(event.target.value)}
+                  onChange={(event) => {
+                    setModalSeason(event.target.value);
+                    setModalEpisode("1");
+                  }}
                 />
               )}
             </div>
@@ -1632,6 +1886,12 @@ function App() {
             </div>
           </div>
           <div className="modal__player">
+            <div
+              className="modal__motion-catcher"
+              aria-hidden="true"
+              onMouseMove={revealModalChrome}
+              onPointerMove={revealModalChrome}
+            />
             {modal.open ? (
               <iframe
                 id="playerFrame"
@@ -1639,6 +1899,78 @@ function App() {
                 src={playerUrl}
                 allowFullScreen
               ></iframe>
+            ) : null}
+            {modal.open && modal.type !== "movie" ? (
+              <div
+                className="modal__quick-controls"
+                aria-label="Selecao rapida de temporada e episodio"
+              >
+                <label className="modal__quick-field" title="Temporada">
+                  <span>T</span>
+                  {modalSeasonList.length > 1 || hasMultipleSeasons(modalMeta) ? (
+                    <select
+                      value={modalSeason}
+                      onChange={(event) => {
+                        setModalSeason(event.target.value);
+                        setModalEpisode("1");
+                      }}
+                      disabled={!modalSeasonList.length}
+                      aria-label="Selecionar temporada"
+                    >
+                      {!modalSeasonList.length ? (
+                        <option value={modalSeason}>...</option>
+                      ) : null}
+                      {modalSeasonList.map((season) => (
+                        <option
+                          key={season.season_number}
+                          value={season.season_number}
+                        >
+                          {season.name || `Temporada ${season.season_number}`}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      min="1"
+                      value={modalSeason}
+                      onChange={(event) => {
+                        setModalSeason(event.target.value);
+                        setModalEpisode("1");
+                      }}
+                      aria-label="Selecionar temporada"
+                    />
+                  )}
+                </label>
+                <label className="modal__quick-field" title="Episodio">
+                  <span>E</span>
+                  {modalEpisodes.length ? (
+                    <select
+                      value={modalEpisode}
+                      onChange={(event) => setModalEpisode(event.target.value)}
+                      aria-label="Selecionar episodio"
+                    >
+                      {modalEpisodes.map((episode) => (
+                        <option
+                          key={episode.id || episode.episode_number}
+                          value={episode.episode_number}
+                        >
+                          E{episode.episode_number}
+                          {episode.name ? ` · ${episode.name}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      min="1"
+                      value={modalEpisode}
+                      onChange={(event) => setModalEpisode(event.target.value)}
+                      aria-label="Selecionar episodio"
+                    />
+                  )}
+                </label>
+              </div>
             ) : null}
           </div>
         </div>
@@ -1655,6 +1987,21 @@ function App() {
         onGenreChange={setGenreFilter}
         genreOptions={genreOptions}
         status={rowsLabel}
+        yearFilter={yearFilter}
+        onYearChange={setYearFilter}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        networkFilter={networkFilter}
+        onNetworkChange={setNetworkFilter}
+        panelOpen={filterPanelOpen}
+        onTogglePanel={() => setFilterPanelOpen((v) => !v)}
+        onClear={() => {
+          setSearch("");
+          setGenreFilter("all");
+          setYearFilter("");
+          setStatusFilter("all");
+          setNetworkFilter("all");
+        }}
       />
       <main>
         <Hero featured={featured} onWatch={openDetail} />

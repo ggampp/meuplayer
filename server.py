@@ -5,6 +5,8 @@ import queue
 import re
 import secrets
 import threading
+import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -159,6 +161,36 @@ def sanitize_rede_buzz_json_body(body):
         return body
     filtered = filter_rede_buzz_payload(payload)
     return json.dumps(filtered, ensure_ascii=False).encode("utf-8")
+
+
+def _normalize_adult_text(value):
+    normalized = unicodedata.normalize("NFKD", str(value or "").strip().lower())
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _tmdb_meta_is_adult(meta):
+    if not isinstance(meta, dict):
+        return False
+    if meta.get("adult") is True:
+        return True
+    text = " ".join(
+        str(meta.get(key) or "")
+        for key in (
+            "title",
+            "name",
+            "original_title",
+            "original_name",
+            "overview",
+            "tagline",
+        )
+    )
+    normalized = _normalize_adult_text(text)
+    return bool(
+        re.search(
+            r"\b(porn|porno|xxx|erotic|erotico|softcore|hardcore)\b",
+            normalized,
+        )
+    )
 
 
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
@@ -878,17 +910,25 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             self._send_json_error(400, "Parâmetro ids é obrigatório")
             return
 
-        items = {}
-        for tmdb_id in ids[:80]:
+        def _fetch_one(tmdb_id):
             try:
                 body, _, cache_status = self._fetch_tmdb_detail(
                     media_type, tmdb_id, warm_images=False
                 )
                 meta = json.loads(body.decode("utf-8"))
+                if _tmdb_meta_is_adult(meta):
+                    return tmdb_id, None
                 meta["_cache"] = cache_status
-                items[tmdb_id] = meta
+                return tmdb_id, meta
             except Exception:
-                items[tmdb_id] = None
+                return tmdb_id, None
+
+        items = {}
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {executor.submit(_fetch_one, tid): tid for tid in ids[:80]}
+            for future in as_completed(futures):
+                tmdb_id, meta = future.result()
+                items[tmdb_id] = meta
 
         payload = json.dumps({"items": items}, ensure_ascii=False).encode("utf-8")
         self._send_response(200, "application/json; charset=utf-8", payload)
@@ -904,6 +944,8 @@ class MeuPlayerHandler(SimpleHTTPRequestHandler):
             try:
                 meta = json.loads(body.decode("utf-8"))
             except Exception:
+                continue
+            if _tmdb_meta_is_adult(meta):
                 continue
             app_type = "movie" if media_type == "movie" else "serie"
             if media_type == "tv" and _is_animation_tv(meta):
