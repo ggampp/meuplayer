@@ -125,13 +125,22 @@ function waitForPort(port, cb, attempts = 0) {
   sock.on('error', () => setTimeout(() => waitForPort(port, cb, attempts + 1), 300));
 }
 
+function getAppIconPath() {
+  const candidate = app.isPackaged
+    ? path.join(process.resourcesPath, 'public', 'icon-512.png')
+    : path.join(__dirname, 'public', 'icon-512.png');
+  return fs.existsSync(candidate) ? candidate : undefined;
+}
+
 function createWindow() {
+  const iconPath = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#0b0b12',
+    ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       webviewTag: true,
       nodeIntegration: false,

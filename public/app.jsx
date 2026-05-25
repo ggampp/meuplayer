@@ -778,6 +778,11 @@ function App() {
   }, [modal.open, modal.id, modal.type]);
 
   useEffect(() => {
+    document.body.classList.toggle("player-open", modal.open);
+    return () => document.body.classList.remove("player-open");
+  }, [modal.open]);
+
+  useEffect(() => {
     fetchJson("/api/settings")
       .then((data) => setTmdbConfigured(Boolean(data.hasTmdbKey)))
       .catch(() => setTmdbConfigured(false));
@@ -1746,9 +1751,12 @@ function App() {
   }
 
   function renderModal() {
+    const backToDetailLabel =
+      modal.type === "movie" ? "Voltar aos detalhes do filme" : "Voltar aos detalhes";
+
     return (
       <div
-        className={`modal ${modal.open ? "is-open" : ""} ${modalChromeVisible ? "modal--chrome-visible" : ""}`}
+        className={`modal modal--immersive ${modal.open ? "is-open" : ""} ${modalChromeVisible ? "modal--chrome-visible" : ""}`}
         aria-hidden={!modal.open}
         onMouseMove={modal.open ? revealModalChrome : undefined}
         onPointerMove={modal.open ? revealModalChrome : undefined}
@@ -1764,7 +1772,7 @@ function App() {
               </h3>
             </div>
             <button type="button" className="modal__close" onClick={closeModal}>
-              ← Voltar ao catálogo
+              ← Voltar aos detalhes
             </button>
           </div>
           <div className="modal__controls">
@@ -1886,6 +1894,14 @@ function App() {
             </div>
           </div>
           <div className="modal__player">
+            <button
+              type="button"
+              className="modal__back-detail"
+              onClick={closeModal}
+              aria-label={backToDetailLabel}
+            >
+              ← {backToDetailLabel}
+            </button>
             <div
               className="modal__motion-catcher"
               aria-hidden="true"

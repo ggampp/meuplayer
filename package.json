@@ -5,14 +5,16 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "icons": "python scripts/generate-icons.py",
     "build:server": "powershell -ExecutionPolicy Bypass -File scripts/build-server.ps1",
-    "build:win": "npm run build:server && electron-builder --win",
-    "build:linux": "npm run build:server && electron-builder --linux",
-    "build:mac": "npm run build:server && electron-builder --mac"
+    "build:win": "npm run icons && npm run build:server && electron-builder --win",
+    "build:linux": "npm run icons && npm run build:server && electron-builder --linux",
+    "build:mac": "npm run icons && npm run build:server && electron-builder --mac"
   },
   "build": {
     "appId": "com.meuplayer.app",
     "productName": "MeuPlayer",
+    "icon": "build/icon.png",
     "files": [
       "main.js",
       "public/**/*",
@@ -34,10 +36,17 @@
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ],
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false
     },
-    "linux": { "target": "AppImage" },
-    "mac": { "target": "dmg" }
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png"
+    }
   },
   "devDependencies": {
     "electron": "^35.0.0",

@@ -15,7 +15,7 @@
   </head>
   <body>
     <script src="/nav.js"></script>
-    <main class="workbench" id="canais-ao-vivo">
+    <main class="workbench workbench--immersive" id="canais-ao-vivo">
       <aside class="workbench__sidebar">
         <header class="workbench__header">
           <p class="workbench__eyebrow">Workbench · TV</p>
@@ -70,6 +70,7 @@
           player.src = channel.src || "";
           status.textContent = `Canal atual · ${channel.nome || channel.id || "Canal"}`;
           scheduleAutoPlayClick();
+          showOverlay();
         }
 
         function scheduleAutoPlayClick() {
@@ -139,10 +140,30 @@
 
         function showOverlay() {
           overlay.classList.add("is-visible");
+          const workbench = document.querySelector(".workbench");
+          const sidebar = document.querySelector(".workbench__sidebar");
+          if (workbench && window.matchMedia("(min-width: 761px)").matches) {
+            workbench.classList.add("workbench--chrome-visible");
+            document.body.classList.add("workbench-chrome-visible");
+          }
           if (overlayTimer) clearTimeout(overlayTimer);
           overlayTimer = setTimeout(() => {
+            if (sidebar && sidebar.contains(document.activeElement)) {
+              showOverlay();
+              return;
+            }
             overlay.classList.remove("is-visible");
+            if (workbench && window.matchMedia("(min-width: 761px)").matches) {
+              workbench.classList.remove("workbench--chrome-visible");
+              document.body.classList.remove("workbench-chrome-visible");
+            }
           }, 2600);
+        }
+
+        const sidebar = document.querySelector(".workbench__sidebar");
+        if (sidebar) {
+          sidebar.addEventListener("mouseenter", showOverlay);
+          sidebar.addEventListener("focusin", showOverlay);
         }
 
         window.addEventListener("mousemove", showOverlay);

@@ -1,4 +1,31 @@
 (function () {
+  function injectIcons() {
+    if (document.querySelector('link[rel="icon"][href="/favicon.ico"]')) return;
+    const specs = [
+      { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+      { rel: 'icon', href: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { rel: 'icon', href: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
+      { rel: 'manifest', href: '/site.webmanifest' },
+    ];
+    specs.forEach(({ rel, href, type, sizes }) => {
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = href;
+      if (type) link.type = type;
+      if (sizes) link.sizes = sizes;
+      document.head.appendChild(link);
+    });
+    if (!document.querySelector('meta[name="theme-color"]')) {
+      const meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      meta.content = '#0d0d1a';
+      document.head.appendChild(meta);
+    }
+  }
+
+  injectIcons();
+
   const LINKS = [
     { label: 'Filmes', path: '/filme' },
     { label: 'Séries', path: '/serie' },

@@ -71,6 +71,9 @@
     const filtersEl = document.querySelector(".workbench__filters");
     const favToggleBtn = document.getElementById("toggleFavoriteBtn");
     const mobileSelect = document.getElementById("channelMobileSelect");
+    const workbench = document.querySelector(".workbench");
+    const sidebar = document.querySelector(".workbench__sidebar");
+    const immersiveQuery = global.matchMedia("(min-width: 761px)");
 
     if (categorySelect) {
       const categoryField = categorySelect.closest("label");
@@ -134,6 +137,7 @@
       player.setAttribute("allow", IFRAME_ALLOW);
       status.textContent = `Canal atual · ${channel.nome}`;
       updateFavoriteButton();
+      showOverlay();
     }
 
     function createChannelRow(channel, index) {
@@ -225,10 +229,27 @@
 
     function showOverlay() {
       overlay.classList.add("is-visible");
+      if (workbench && immersiveQuery.matches) {
+        workbench.classList.add("workbench--chrome-visible");
+        document.body.classList.add("workbench-chrome-visible");
+      }
       if (overlayTimer) clearTimeout(overlayTimer);
       overlayTimer = setTimeout(() => {
+        if (sidebar && sidebar.contains(document.activeElement)) {
+          showOverlay();
+          return;
+        }
         overlay.classList.remove("is-visible");
+        if (workbench && immersiveQuery.matches) {
+          workbench.classList.remove("workbench--chrome-visible");
+          document.body.classList.remove("workbench-chrome-visible");
+        }
       }, 2600);
+    }
+
+    if (sidebar) {
+      sidebar.addEventListener("mouseenter", showOverlay);
+      sidebar.addEventListener("focusin", showOverlay);
     }
 
     function filterFavoritesLocal(term) {
