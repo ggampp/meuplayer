@@ -11,6 +11,9 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
+import android.net.Uri;
+import android.util.Log;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -47,6 +50,16 @@ public class MainActivity extends AppCompatActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
+        settings.setSupportMultipleWindows(false);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                Log.d("meuplayer", "Popup bloqueado via onCreateWindow");
+                return false;
+            }
+        });
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -55,6 +68,25 @@ public class MainActivity extends AppCompatActivity {
                 if (request.isForMainFrame()) {
                     showUrlDialog("Não foi possível conectar. Verifique a URL do servidor:");
                 }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                String serverUrl = prefs.getString(KEY_SERVER_URL, "");
+
+                if (!serverUrl.isEmpty()) {
+                    Uri serverUri = Uri.parse(serverUrl);
+                    Uri targetUri = request.getUrl();
+
+                    if (targetUri.getHost() != null && !targetUri.getHost().equalsIgnoreCase(serverUri.getHost())) {
+                        if (request.isForMainFrame()) {
+                            Log.d("meuplayer", "Redirecionamento bloqueado para: " + url);
+                            return true; // Bloqueia navegação principal para fora do servidor
+                        }
+                    }
+                }
+                return false;
             }
         });
 

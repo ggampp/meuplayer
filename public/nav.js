@@ -222,6 +222,24 @@
         if (typeof window.meuPlayerSelectAdjacentChannel === 'function') {
           window.meuPlayerSelectAdjacentChannel(1);
         }
+      } else if (action.startsWith('key_')) {
+        const keyMap = {
+          'key_up': 'ArrowUp',
+          'key_down': 'ArrowDown',
+          'key_left': 'ArrowLeft',
+          'key_right': 'ArrowRight',
+          'key_ok': 'Enter',
+          'key_back': 'Escape'
+        };
+        const mappedKey = keyMap[action];
+        if (mappedKey) {
+          const event = new KeyboardEvent('keydown', {
+            key: mappedKey,
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+        }
       }
     }
 

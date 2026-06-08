@@ -25,14 +25,25 @@ they vary only in component archetypes.
 - **Detail pages** (filme / série / anime detail): **Long Document**
   - Poster as inline figure, sticky on scroll-Y until reaches Temporadas
   - Sinopse as prose paragraph, max-width 60ch, body type
-  - Temporadas as ordered list (NOT card grid) — episode rows with
-    thumbnail + number + title + abbreviated overview + runtime
+  - Elenco as a horizontal scroll component (`cast-scroll`) containing profile card buttons (`cast-card`) with circular images and role labels
+  - Temporadas as ordered list (NOT card grid) — episode rows with thumbnail + number + title + abbreviated overview + runtime
   - Relacionados as a sub-grid at the bottom
+- **Person detail page** (ator / membro técnico): **Long Document (Profile Variation)**
+  - Class `detail--person` wraps the main container
+  - Poster styled as a profile photo container (`detail__poster--profile`)
+  - Stacked metadata lines (`detail__meta--stacked`) for birthday and birthplace info
+  - Biography block (`detail__bio-block`) as a structured overview section
+  - Known For works as a horizontal scroll component (`known-for-scroll`) containing poster cards (`known-for-card`)
 - **App-utility pages** (canais + rede-buzz): **Workbench**
   - Two-column: sidebar (channel list + filters) left, player right
   - Sidebar density: compact rows, no card chrome
   - Player area: pure black, iframe full-bleed
   - Floating overlay (channel up/down) stays — utility controls
+- **Immersive Player Modal** (player de mídia flutuante): **Immersive Cinema**
+  - Full-screen container `modal--immersive` with pure black backdrop
+  - Auto-hiding chrome controls: navigation bar is visible only when mouse/pointer activity is detected over the catch zone (`modal__motion-catcher`), fading out (`modal--chrome-visible` toggled off) after 1.5 seconds of idle time
+  - Includes a quick navigation panel (`modal__quick-controls`) with custom selectors to switch seasons and episodes on the fly without exiting the player
+
 
 ## Theme — atmospheric Bloom (locked)
 

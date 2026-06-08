@@ -1,32 +1,34 @@
 # MeuPlayer
 
-MeuPlayer e um aplicativo desktop de catalogo e player feito com Electron, um servidor Python local e frontend web. O app abre uma janela desktop, sobe um servidor HTTP local e entrega as telas da pasta `public`.
+MeuPlayer é um aplicativo desktop e TV Box de catálogo e player multimídia desenvolvido com Electron, um servidor Python local (com cache em banco de dados) e frontend web em React. O app abre uma janela desktop, sobe um servidor HTTP local e entrega as telas da pasta `public`.
 
 ## Recursos
 
-- Catalogo de filmes, series e animes com dados da API SuperFlix e metadados do TMDB.
-- Cache persistente de metadados TMDB e imagens (SQLite ou PostgreSQL + disco para imagens).
-- Player embutido para filmes, series e animes.
-- Aba `Canais` com canais ao vivo carregados a partir de `public/canais.json`.
-- Aba `Rede Buzz` com canais da API [Rei dos Embeds](https://reidosembeds.com/doc) (embed `rde.buzz`).
-- Submenu lateral de canais com destaque do canal atual.
-- Navegacao de canais por teclado:
+- **Catálogo Multimídia:** Filmes, séries, animes e doramas com dados da API SuperFlix e metadados ricos do TMDB.
+- **Cache Persistente:** Cache local e persistente de metadados TMDB e imagens para evitar requisições desnecessárias. Suporta **SQLite** (padrão) e **PostgreSQL** (configurável via `.env`).
+- **Elenco e Filmografia:** Exibição do elenco detalhado na tela de informações do título. Permite clicar em qualquer ator/membro para abrir sua biografia detalhada e lista de trabalhos conhecidos (filmografia).
+- **Player Imersivo:** Reprodutor de vídeo integrado com controles de episódios/temporadas rápidos e sistema de ocultação automática de barra de navegação/controles (fade-out ao ficar com o mouse parado).
+- **Controle Remoto via SSE:** Permite controlar o aplicativo remotamente por outro dispositivo (como celular) a partir de Server-Sent Events (SSE). O QR code para emparelhamento fica nas Configurações do app.
+- **Aba Canais & Rede Buzz:** Canais de TV ao vivo integrados a partir do `public/canais.json` ou via API do *Rei dos Embeds* na Rede Buzz.
+- **Filtro de Conteúdo Adulto:** Proteção nativa que bloqueia categorias e metadados impróprios ou classificados como adultos nas listagens e buscas do TMDB e da Rede Buzz.
+- **Navegação de Canais por Teclado:**
   - `Seta para cima`: canal anterior.
-  - `Seta para baixo`: proximo canal.
-- Controles flutuantes na aba `Canais` para canal anterior, tentar play e proximo canal.
-- Bloqueio de popups abertos por players externos.
+  - `Seta para baixo`: próximo canal.
+- **Controles Flutuantes:** Painel flutuante com botões para canal anterior, tentar play (clique no iframe) e próximo canal.
+- **Bloqueio de Popups:** Interceptação ativa no Electron que fecha automaticamente novas abas/popups geradas por propagandas de players externos.
 
 ## Stack
 
 - Electron
-- Python `http.server`
+- Python `http.server` + `sqlite3` ou `psycopg2` para cache
 - React 18 via CDN na interface principal
-- SQLite ou PostgreSQL para cache de API (configurável via `.env`)
-- Electron Builder + PyInstaller (servidor embutido no `.exe`)
+- Docker & Docker Compose (para deploy em VPS)
+- Android SDK (Projeto nativo de TVBox em `/android`)
+- Electron Builder + PyInstaller (servidor Python embutido no `.exe`)
 
-## Como Rodar
+## Como Rodar (Desenvolvimento Desktop)
 
-Instale as dependencias:
+Instale as dependências:
 
 ```powershell
 npm install
@@ -73,15 +75,9 @@ No log do servidor aparece `[meuplayer] cache: sqlite` ou `cache: postgres`.
 
 #### Deploy na VPS
 
-O `docker-compose.yml` da raiz já está pronto para a VPS: o serviço `app` é
-anexado à rede externa `database_default` (mantida pelo stack `database`), onde
-o hostname `postgres` resolve para o Postgres compartilhado. Também participa
-da rede `edge` para que o Traefik externo publique
-`meuplayer.meusaplicativos.com` com TLS via Let's Encrypt.
+O `docker-compose.yml` da raiz já está pronto para a VPS: o serviço `app` é anexado à rede externa `database_default` (mantida pelo stack `database`), onde o hostname `postgres` resolve para o Postgres compartilhado. Também participa da rede `edge` para que o Traefik externo publique `meuplayer.meusaplicativos.com` com TLS via Let's Encrypt.
 
-Para subir basta preencher o `.env` da VPS com a connection string gerada no
-painel `db.meusaplicativos.com` (apontando para `postgres:5432`) e rodar
-`docker compose up -d`.
+Para subir basta preencher o `.env` da VPS com a connection string gerada no painel `db.meusaplicativos.com` (apontando para `postgres:5432`) e rodar `docker compose up -d`.
 
 ## Scripts
 
@@ -97,34 +93,35 @@ O build do Windows **não exige Python instalado** na máquina do usuário: o `m
 
 ## Estrutura
 
-- `main.js`: processo principal do Electron, criacao da janela, servidor Python, bloqueio de popups e atalhos globais da aba `Canais`.
-- `server.py`: servidor HTTP local, rotas do app, proxies de API e cache.
-- `public/app.jsx`: interface principal de filmes, series e animes.
-- `public/canais.html`: tela de canais ao vivo.
-- `public/rede-buzz.html`: tela Rede Buzz (Rei dos Embeds).
-- `public/rede-buzz-favoritos.html`: canais favoritos da Rede Buzz (salvos no navegador).
-- `public/rede-buzz-store.js` / `public/rede-buzz-ui.js`: favoritos e UI compartilhada das abas Buzz.
-- `public/canais.json`: lista de canais e URLs dos players.
-- `public/nav.js`: navegacao comum do app.
-- `cache.sqlite3`: cache SQLite (quando `CACHE_DATABASE_URL` não está definida).
-- `cache_db.py`: camada SQLite/PostgreSQL do cache.
+- `main.js`: processo principal do Electron, criação da janela, servidor Python, bloqueio de popups e atalhos globais da aba `Canais`.
+- `server.py`: servidor HTTP local, rotas do app, proxies de API, controle remoto (SSE) e cache.
+- `cache_db.py`: camada SQLite/PostgreSQL de cache.
+- `public/app.jsx`: interface React principal (filmes, séries, animes, doramas, elenco, biografia de pessoas).
+- `public/canais.html`: tela de canais ao vivo configurados.
+- `public/canais.json`: lista de canais locais e URLs dos players.
+- `public/rede-buzz.html`: tela Rede Buzz (canais da API do Rei dos Embeds).
+- `public/rede-buzz-favoritos.html`: favoritos salvos da Rede Buzz.
+- `public/remote.html`: interface do controle remoto para dispositivos móveis.
+- `public/nav.js`: injeção da navegação comum e receptor de comandos do controle remoto (SSE).
+- `android/`: projeto Android nativo configurado para TV Box.
 
-## Canais
+## Controle Remoto (SSE)
 
-A aba `Canais` usa os itens configurados em `public/canais.json`. Cada item deve ter um `id`, um `nome` e uma `src` com a URL do player.
+O aplicativo conta com uma funcionalidade de controle remoto. 
+1. Vá até a tela de **Configurações** no app desktop.
+2. Escaneie o QR code gerado com o seu celular (ou acesse a URL informada na mesma página passando o token de sessão gerado).
+3. Pela interface móvel (`/remote.html`), você conseguirá alternar entre abas (Filmes, Séries, Canais, etc.), realizar buscas textuais globais e avançar/retroceder canais ao vivo diretamente do telefone.
 
-Exemplo:
+## Projeto Android (TV Box)
 
-```json
-{
-  "id": "canal",
-  "nome": "Nome do Canal",
-  "src": "https://exemplo.com/player"
-}
-```
+Na pasta `/android`, há um projeto Android nativo que envelopa o MeuPlayer em um `WebView` de tela cheia.
+* **Foco em TVs:** Possui suporte a controles remotos convencionais (controle por setas/DPAD) e layout focado em tela cheia paisagem.
+* **Compilação:** Abra a pasta `/android` no **Android Studio**, espere as dependências do Gradle sincronizarem e vá em `Build > Build Bundle(s) / APK(s) > Build APK(s)`. O APK gerado estará em `android/app/build/outputs/apk/debug/app-debug.apk`.
+* **Configuração de URL:** Na primeira execução no TV Box, o aplicativo solicitará a URL da sua VPS (ex: `https://meuplayer.meusaplicativos.com`). O endereço fica salvo localmente. Se desejar alterá-lo futuramente, pressione a tecla **Menu** ou mantenha pressionada a tecla **Voltar** do controle remoto.
 
-## Observacoes
+## Observações
 
-- Players externos podem exigir interacao manual, bloquear embeds ou alterar comportamento sem aviso.
+- Players externos podem exigir interação manual, bloquear embeds ou alterar comportamento sem aviso.
 - O app tenta iniciar o player automaticamente simulando cliques no centro do iframe, mas alguns players podem exigir mais de uma tentativa.
 - Arquivos de cache transientes, `node_modules`, `.env` e caches Python ficam ignorados pelo Git.
+

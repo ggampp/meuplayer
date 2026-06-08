@@ -247,6 +247,75 @@
         z-index: 100;
       }
       .remote__flash--active { opacity: 1; }
+
+      /* D-Pad Layout */
+      .remote__dpad-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        background: var(--paper-2);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+      }
+      .remote__dpad {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .remote__dpad-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .remote__dpad-btn {
+        background: var(--paper-3);
+        border: 1px solid var(--rule);
+        border-radius: 50%;
+        color: var(--ink);
+        font-size: 1.2rem;
+        width: 3.5rem;
+        height: 3.5rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.15s, transform 0.1s;
+      }
+      .remote__dpad-btn:active {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        color: var(--accent);
+        transform: scale(0.95);
+      }
+      .remote__dpad-btn--ok {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-radius: var(--radius-sm);
+        font-weight: bold;
+        font-size: 0.9rem;
+      }
+      .remote__dpad-btn--ok:active {
+        background: var(--accent);
+        opacity: 0.8;
+        color: var(--accent-ink);
+      }
+      .remote__dpad-extra {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+      .remote__dpad-btn--back {
+        width: 70%;
+        height: 2.8rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
     </style>
   </head>
   <body>
@@ -306,6 +375,25 @@
             </button>
           </div>
         </section>
+
+        <!-- Virtual D-Pad -->
+        <section class="remote__section" id="dpadSection" style="display:none">
+          <p class="remote__label">Navegação D-Pad</p>
+          <div class="remote__dpad-container">
+            <div class="remote__dpad">
+              <button class="remote__dpad-btn remote__dpad-btn--up" id="dpadUp">▲</button>
+              <div class="remote__dpad-row">
+                <button class="remote__dpad-btn remote__dpad-btn--left" id="dpadLeft">◀</button>
+                <button class="remote__dpad-btn remote__dpad-btn--ok" id="dpadOk">OK</button>
+                <button class="remote__dpad-btn remote__dpad-btn--right" id="dpadRight">▶</button>
+              </div>
+              <button class="remote__dpad-btn remote__dpad-btn--down" id="dpadDown">▼</button>
+            </div>
+            <div class="remote__dpad-extra">
+              <button class="remote__dpad-btn remote__dpad-btn--back" id="dpadBack">Voltar</button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -322,10 +410,17 @@
         const navSection = document.getElementById('navSection');
         const searchSection = document.getElementById('searchSection');
         const channelSection = document.getElementById('channelSection');
+        const dpadSection = document.getElementById('dpadSection');
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         const chUpBtn = document.getElementById('chUpBtn');
         const chDownBtn = document.getElementById('chDownBtn');
+        const dpadUp = document.getElementById('dpadUp');
+        const dpadDown = document.getElementById('dpadDown');
+        const dpadLeft = document.getElementById('dpadLeft');
+        const dpadRight = document.getElementById('dpadRight');
+        const dpadOk = document.getElementById('dpadOk');
+        const dpadBack = document.getElementById('dpadBack');
         const flash = document.getElementById('flash');
 
         function setStatus(state, text) {
@@ -367,6 +462,7 @@
         navSection.style.display = '';
         searchSection.style.display = '';
         channelSection.style.display = '';
+        dpadSection.style.display = '';
         setStatus('ok', 'Conectado');
 
         // Navigation buttons
@@ -395,6 +491,14 @@
         // Channel controls
         chUpBtn.addEventListener('click', function () { sendCommand('channel_up'); });
         chDownBtn.addEventListener('click', function () { sendCommand('channel_down'); });
+
+        // D-Pad Controls
+        dpadUp.addEventListener('click', function () { sendCommand('key_up'); });
+        dpadDown.addEventListener('click', function () { sendCommand('key_down'); });
+        dpadLeft.addEventListener('click', function () { sendCommand('key_left'); });
+        dpadRight.addEventListener('click', function () { sendCommand('key_right'); });
+        dpadOk.addEventListener('click', function () { sendCommand('key_ok'); });
+        dpadBack.addEventListener('click', function () { sendCommand('key_back'); });
       })();
     </script>
   </body>

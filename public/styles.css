@@ -1,4 +1,4 @@
-﻿/* Hallmark · macrostructure: Marquee Hero (browse) · Long Document (detail) · Workbench (utility)
+/* Hallmark · macrostructure: Marquee Hero (browse) · Long Document (detail) · Workbench (utility)
  * genre: atmospheric · theme: Bloom · design-system: design.md · designed-as-app
  * pre-emit critique: P5 H4 E5 S4 R5 V4
  * Tokens: tokens.css
@@ -2319,3 +2319,9 @@ body.player-open .modal {
     transition-duration: 0ms;
   }
 }
+
+.modal__back-detail--fallback {
+  left: auto;
+  right: 1.5rem;
+}
+

@@ -728,8 +728,68 @@ function App() {
   const [doramaHasMore, setDoramaHasMore] = useState(false);
   const [doramaLoading, setDoramaLoading] = useState(false);
   const [tmdbConfigured, setTmdbConfigured] = useState(null);
+  const [historyItems, setHistoryItems] = useState([]);
   const metaMapRef = useRef({});
   const modalChromeTimerRef = useRef(null);
+
+  const loadHistory = () => {
+    try {
+      const key = "meuplayer_history";
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        setHistoryItems(JSON.parse(raw));
+      } else {
+        setHistoryItems([]);
+      }
+    } catch (e) {
+      setHistoryItems([]);
+    }
+  };
+
+  const savePlaybackProgress = (item, season = "1", episode = "1") => {
+    try {
+      const key = "meuplayer_history";
+      const raw = localStorage.getItem(key);
+      let history = raw ? JSON.parse(raw) : [];
+
+      history = history.filter((h) => !(h.id === item.id && h.type === item.type));
+
+      const metaKey = `${item.type}-${item.id}`;
+      const meta = metaMapRef.current[metaKey] || {};
+
+      history.unshift({
+        id: item.id,
+        type: item.type,
+        season: season,
+        episode: episode,
+        timestamp: Date.now(),
+        meta: {
+          title: meta.title || meta.name || item.id,
+          poster_path: meta.poster_path || "",
+          backdrop_path: meta.backdrop_path || "",
+          overview: meta.overview || ""
+        }
+      });
+
+      if (history.length > 10) {
+        history = history.slice(0, 10);
+      }
+
+      localStorage.setItem(key, JSON.stringify(history));
+    } catch (e) {
+      console.error("Erro ao salvar progresso de reprodução:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, [modal.open]);
+
+  useEffect(() => {
+    if (modal.open && modal.id) {
+      savePlaybackProgress({ id: modal.id, type: modal.type }, modalSeason, modalEpisode);
+    }
+  }, [modal.open, modal.id, modal.type, modalSeason, modalEpisode]);
 
   useEffect(() => {
     metaMapRef.current = metaMap;
@@ -1902,6 +1962,13 @@ function App() {
             >
               ← {backToDetailLabel}
             </button>
+            <button
+              type="button"
+              className="modal__back-detail modal__back-detail--fallback"
+              onClick={() => setPlayerProvider((prev) => prev === "superflix" ? "vidsrc" : "superflix")}
+            >
+              Problema com o vídeo? Alternar Player ({playerProvider === "superflix" ? "Vidsrc" : "SuperFlix"})
+            </button>
             <div
               className="modal__motion-catcher"
               aria-hidden="true"
@@ -2024,6 +2091,31 @@ function App() {
 
         <section className="rows" id="rows">
           <div className="rows__container">
+            {historyItems.length > 0 && !searchResults && !genreResults && (
+              <section className="row" aria-labelledby="row-history">
+                <header className="row__header">
+                  <h2 className="row__title" id="row-history">Continuar Assistindo</h2>
+                  <span className="row__status">Seu histórico de reprodução</span>
+                </header>
+                <div className="row__grid">
+                  {historyItems.map((item) => (
+                    <MediaCard
+                      key={`history-${item.type}-${item.id}`}
+                      item={item}
+                      meta={item.meta || {}}
+                      onSelect={(clicked) => {
+                        openDetail(clicked);
+                        setTimeout(() => {
+                          openModal(clicked, item.season, item.episode);
+                        }, 200);
+                      }}
+                      compact
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {filteredRows.map((row) => (
               <GridRow
                 key={row.key}

@@ -49,8 +49,9 @@ function loadProjectDotEnv() {
 function getServerLaunch() {
   if (app.isPackaged) {
     const resources = process.resourcesPath;
+    const isWin = process.platform === 'win32';
     return {
-      command: path.join(resources, 'meuplayer-server.exe'),
+      command: path.join(resources, isWin ? 'meuplayer-server.exe' : 'meuplayer-server'),
       args: [],
       cwd: resources,
       staticDir: path.join(resources, 'public'),
@@ -58,8 +59,8 @@ function getServerLaunch() {
   }
 
   return {
-    command: process.platform === 'win32' ? 'python' : 'python3',
-    args: [path.join(__dirname, 'server.py')],
+    command: 'go',
+    args: ['run', '.'],
     cwd: __dirname,
     staticDir: path.join(__dirname, 'public'),
   };
@@ -109,9 +110,9 @@ function startServer() {
     cwd: launch.cwd,
     windowsHide: true,
   });
-  pyProc.stdout.on('data', (d) => console.log('[py]', d.toString().trim()));
-  pyProc.stderr.on('data', (d) => console.error('[py:err]', d.toString().trim()));
-  pyProc.on('exit', (code) => console.log(`[py] exited with code ${code}`));
+  pyProc.stdout.on('data', (d) => console.log('[go]', d.toString().trim()));
+  pyProc.stderr.on('data', (d) => console.error('[go:err]', d.toString().trim()));
+  pyProc.on('exit', (code) => console.log(`[go] exited with code ${code}`));
   return true;
 }
 
