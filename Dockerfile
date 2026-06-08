@@ -18,7 +18,7 @@ WORKDIR /app
 COPY --from=builder /build/meuplayer-server .
 COPY --from=builder /build/public/ ./public/
 
-ENV PORT=8000
+ENV PORT=3000
 ENV MEUPLAYER_USER_DATA=/data
 ENV MEUPLAYER_STATIC_DIR=/app/public
 
@@ -26,7 +26,7 @@ RUN mkdir -p /data
 
 VOLUME ["/data"]
 
-EXPOSE 8000
+EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
     CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/ || exit 1

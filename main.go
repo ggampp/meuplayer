@@ -30,7 +30,7 @@ var (
 )
 
 const (
-	Port                   = "8765"
+	Port                   = "3000"
 	ApiBase                = "https://superflixapi.one"
 	RdeApiBase             = "https://reidosembeds.com/api"
 	RdeAdultCategory       = "adulto"
