@@ -69,6 +69,12 @@
           if (mobileSelect) mobileSelect.value = String(index);
           player.src = channel.src || "";
           status.textContent = `Canal atual · ${channel.nome || channel.id || "Canal"}`;
+
+          // Atualiza a URL sem recarregar a página para manter o histórico
+          const url = new URL(window.location);
+          url.searchParams.set("canal", channel.id);
+          window.history.replaceState({}, "", url);
+
           scheduleAutoPlayClick();
           showOverlay();
         }
@@ -112,11 +118,22 @@
             button.addEventListener("click", () => selectChannel(index));
             grid.appendChild(button);
             channelButtons.push(button);
-
-            if (index === 0 && channel.src) {
-              selectChannel(index);
-            }
           });
+
+          // Determina o canal inicial com base no parâmetro "canal" na URL ou índice 0
+          const urlParams = new URLSearchParams(window.location.search);
+          const initialCanalId = urlParams.get("canal");
+          let initialIndex = 0;
+          if (initialCanalId) {
+            const foundIndex = channels.findIndex(c => c.id === initialCanalId);
+            if (foundIndex !== -1) {
+              initialIndex = foundIndex;
+            }
+          }
+
+          if (channels.length > 0) {
+            selectChannel(initialIndex);
+          }
         }
 
         window.addEventListener("keydown", (event) => {
