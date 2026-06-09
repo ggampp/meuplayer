@@ -136,6 +136,12 @@
       player.src = embedUrl;
       player.setAttribute("allow", IFRAME_ALLOW);
       status.textContent = `Canal atual · ${channel.nome}`;
+
+      // Atualiza a URL sem recarregar a página para manter o histórico
+      const url = new URL(window.location);
+      url.searchParams.set("canal", channel.id);
+      window.history.replaceState({}, "", url);
+
       updateFavoriteButton();
       showOverlay();
     }
@@ -213,7 +219,17 @@
           : `${channelList.length} canal(is) disponível(is)`;
 
       if (autoSelect) {
-        selectChannel(0);
+        // Determina o canal inicial com base no parâmetro "canal" na URL ou índice 0
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialCanalId = urlParams.get("canal");
+        let initialIndex = 0;
+        if (initialCanalId) {
+          const foundIndex = channelList.findIndex(c => c.id === initialCanalId);
+          if (foundIndex !== -1) {
+            initialIndex = foundIndex;
+          }
+        }
+        selectChannel(initialIndex);
       }
     }
 
