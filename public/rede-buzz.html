@@ -91,6 +91,18 @@
     <script src="/rede-buzz-store.js"></script>
     <script src="/rede-buzz-ui.js"></script>
     <script>
+      // Aviso de ambiente (injetado pelo Electron)
+      (function () {
+        const isElectron = !!(window.__MEUPLAYER_ENV && window.__MEUPLAYER_ENV.isElectron);
+        if (!isElectron) {
+          const banner = document.createElement("div");
+          banner.style.cssText = "background:var(--color-accent-soft);color:var(--color-ink);padding:6px 12px;border-radius:6px;font-size:0.8rem;margin:8px 0;border:1px solid var(--color-rule-2);";
+          banner.textContent = "Usando no navegador. A experiência completa de canais (teclado + autoplay) é melhor no app desktop.";
+          const header = document.querySelector(".workbench__header");
+          if (header) header.after(banner);
+        }
+      })();
+
       MeuPlayerRedeBuzzUI.init({ mode: "all" });
     </script>
   </body>

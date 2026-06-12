@@ -125,3 +125,24 @@ Na pasta `/android`, há um projeto Android nativo que envelopa o MeuPlayer em u
 - O app tenta iniciar o player automaticamente simulando cliques no centro do iframe, mas alguns players podem exigir mais de uma tentativa.
 - Arquivos de cache transientes, `node_modules`, `.env` e caches Python ficam ignorados pelo Git.
 
+## Usar em outro computador (sem clonar o repositório)
+
+O MeuPlayer foi projetado para ser acessível de qualquer máquina:
+
+1. **Versão Web (mais simples)**  
+   Basta abrir o endereço da sua instância no VPS (ex: `https://meuplayer.seudominio.com`).  
+   Funciona em qualquer navegador moderno. Catálogo completo + Rede Buzz já estão disponíveis.
+
+2. **Aplicativo Desktop completo**  
+   Baixe a versão portable ou instalador em:
+   - `/downloads` dentro do próprio app (quando estiver rodando a versão web), ou
+   - GitHub Releases (configure `owner/repo` no `package.json` e publique os builds gerados com `npm run build:win` / `build:linux`).
+
+A experiência mais completa (especialmente troca de canais por setas do teclado e simulação de play) acontece no app Electron. A versão web degrada graciosamente com avisos claros nas páginas de TV.
+
+Veja também a página interna **Configurações → Usar em outro computador** e o arquivo `SPRINTS.md` para o roadmap de melhorias.
+
+## Status do projeto
+
+Consulte [SPRINTS.md](./SPRINTS.md) para o plano atual de melhorias organizado em sprints (prioridade alta primeiro).
+

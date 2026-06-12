@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>MeuPlayer · Downloads</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,144,400;1,144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <script src="/nav.js"></script>
+
+    <main class="settings-page">
+      <header class="settings-page__header">
+        <p class="settings-page__eyebrow">Distribuição</p>
+        <h1 class="settings-page__title">Downloads</h1>
+        <p class="settings-page__lead">
+          Use o MeuPlayer em qualquer computador sem clonar o repositório.
+        </p>
+      </header>
+
+      <!-- Opção Web (principal para uso rápido) -->
+      <section class="settings-remote" style="margin-bottom: var(--space-xl)">
+        <header class="settings-remote__header">
+          <h2 class="settings-remote__title">Usar no navegador (qualquer computador)</h2>
+          <p class="settings-remote__lead">
+            A versão web roda direto no seu VPS. Basta abrir o endereço no navegador.
+            É a forma mais rápida de usar em outro PC, notebook ou celular.
+          </p>
+        </header>
+        <div class="settings-remote__body">
+          <div>
+            <a
+              class="btn btn--primary"
+              href="/"
+              style="display: inline-flex; margin-bottom: 0.5rem"
+            >
+              Abrir MeuPlayer agora
+            </a>
+            <p class="settings-form__hint">
+              Recomendado para uso casual ou quando você não quiser instalar nada.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Desktop completo -->
+      <section>
+        <header class="settings-page__header" style="margin-top: 0; padding-top: 0">
+          <h2 class="settings-page__title" style="font-size: var(--text-2xl)">
+            Baixar o aplicativo desktop completo
+          </h2>
+          <p class="settings-page__lead">
+            Experiência completa com bloqueio de popups, troca de canais por teclado,
+            simulação automática de play e melhor integração com o controle remoto.
+            <strong>Recomendado</strong> se você usa bastante a aba de TV ao vivo.
+          </p>
+        </header>
+
+        <div style="display: grid; gap: var(--space-md); max-width: 720px;">
+          <div id="downloads-list">Carregando downloads...</div>
+
+          <p class="settings-form__hint" style="margin-top: var(--space-sm);">
+            Os links acima apontam para a última release no GitHub.<br>
+            Atualize o owner/repo no package.json e gere novas releases com <code>npm run build:win</code> (ou linux/mac).
+            Coloque os arquivos em <code>public/downloads/</code> (ignorados pelo git) para hospedagem própria.
+          </p>
+        </div>
+
+        <script>
+          (function () {
+            const container = document.getElementById('downloads-list');
+            fetch('/downloads/manifest.json')
+              .then(r => r.ok ? r.json() : null)
+              .then(manifest => {
+                if (!manifest || !manifest.downloads) {
+                  container.innerHTML = '<div class="settings-form__hint">Nenhum manifest encontrado. Use os links do GitHub Releases.</div>';
+                  return;
+                }
+                let html = '';
+                manifest.downloads.forEach(d => {
+                  const rec = d.recommended ? ' — Recomendado' : '';
+                  html += `
+                    <div class="settings-form" style="padding: var(--space-md);">
+                      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-wrap: wrap;">
+                        <div>
+                          <strong>${d.platform}${rec}</strong>
+                          <div class="settings-form__hint" style="margin-top: 4px;">${d.note || ''}</div>
+                        </div>
+                        <a class="btn ${d.recommended ? 'btn--primary' : 'btn--ghost'}" href="${d.url}" target="_blank" rel="noopener">Baixar</a>
+                      </div>
+                    </div>`;
+                });
+                if (manifest.web) {
+                  html += `
+                    <div style="margin-top: var(--space-md);">
+                      <a class="btn btn--primary" href="${manifest.web.url}">${manifest.web.note || 'Usar versão web agora'}</a>
+                    </div>`;
+                }
+                container.innerHTML = html;
+              })
+              .catch(() => {
+                container.innerHTML = '<a class="btn btn--primary" href="https://github.com/seu-usuario/meuplayer/releases/latest" target="_blank">Ver releases no GitHub</a>';
+              });
+          })();
+        </script>
+      </section>
+
+      <section class="settings-help" style="margin-top: var(--space-2xl);">
+        <h2 class="settings-help__title">Como atualizar os downloads no seu site</h2>
+        <ol style="line-height: 1.7; color: var(--color-ink-2);">
+          <li>Faça o build: <code>npm run build:win</code> (ou linux).</li>
+          <li>Os artefatos ficam em <code>dist/</code>.</li>
+          <li>Coloque os arquivos desejados em <code>public/downloads/</code> (esta pasta é ignorada pelo git).</li>
+          <li>Ou simplesmente atualize os links acima apontando para a sua release mais recente.</li>
+          <li>Rebuild e redeploy do Docker para que a página /downloads reflita as mudanças.</li>
+        </ol>
+        <p class="settings-form__hint" style="margin-top: var(--space-sm);">
+          Dica: o arquivo <strong>portable</strong> é o mais conveniente para uso pessoal em vários computadores.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -151,9 +151,18 @@ function createWindow() {
   });
 
   mainWindow.loadURL(`http://localhost:${PORT}/`);
+
+  // Injeta informações de ambiente para o frontend detectar Electron vs browser.
+  // Usado principalmente nas páginas de Live (canais / rede-buzz) para fallbacks e avisos.
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents
       .executeJavaScript(`
+      window.__MEUPLAYER_ENV = {
+        isElectron: true,
+        platform: ${JSON.stringify(process.platform)},
+        version: ${JSON.stringify(app.getVersion ? app.getVersion() : '1.1.0')}
+      };
+
       if (!window.__meuPlayerAutoPlayBridge) {
         window.__meuPlayerAutoPlayBridge = true;
         window.addEventListener('meuplayer:channel-selected', () => {

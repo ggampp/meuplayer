@@ -44,6 +44,21 @@
 
     <script>
       (function () {
+        const isElectron = !!(window.__MEUPLAYER_ENV && window.__MEUPLAYER_ENV.isElectron);
+
+        // Aviso para usuários em navegador (melhor experiência no app desktop)
+        if (!isElectron) {
+          const banner = document.createElement("div");
+          banner.style.cssText = "background:var(--color-accent-soft);color:var(--color-ink);padding:6px 12px;border-radius:6px;font-size:0.8rem;margin-bottom:8px;border:1px solid var(--color-rule-2);";
+          banner.innerHTML = "Usando no navegador. Troca por teclado e autoplay automático são mais confiáveis no app desktop completo.";
+          const header = document.querySelector(".workbench__header");
+          if (header) header.after(banner);
+          else {
+            const statusEl = document.getElementById("channelsStatus");
+            if (statusEl) statusEl.before(banner);
+          }
+        }
+
         const grid = document.getElementById("channelsGrid");
         const player = document.getElementById("player");
         const overlay = document.getElementById("playerOverlay");

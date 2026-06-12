@@ -1,0 +1,26 @@
+{
+  "version": "1.2.0",
+  "updated": "2026-06-12",
+  "downloads": [
+    {
+      "platform": "Windows Portable",
+      "recommended": true,
+      "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
+      "note": "Melhor para uso pessoal. Execute direto, sem instalação."
+    },
+    {
+      "platform": "Windows Installer",
+      "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
+      "note": "Instalador completo com atalhos."
+    },
+    {
+      "platform": "Linux AppImage",
+      "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
+      "note": "Portable para Linux."
+    }
+  ],
+  "web": {
+    "url": "/",
+    "note": "Versão web instantânea em qualquer computador (recomendada para uso rápido)."
+  }
+}

@@ -33,6 +33,7 @@
     { label: 'Doramas', path: '/dorama' },
     { label: 'TV', path: '/rede-buzz' },
     { label: 'TV Favoritos', path: '/rede-buzz-favoritos' },
+    { label: 'Downloads', path: '/downloads' },
     { label: 'Configurações', path: '/configuracoes' },
   ];
 

@@ -84,6 +84,64 @@
           <li>Cole a chave acima e clique em <strong>Salvar</strong>.</li>
         </ol>
       </section>
+
+      <section class="settings-help" style="margin-top: var(--space-xl);">
+        <h2 class="settings-help__title">Usar em outro computador</h2>
+        <p>
+          Você pode usar o MeuPlayer em qualquer PC sem clonar este repositório:
+        </p>
+        <ul style="margin: 0.5rem 0 1rem 1.25rem; line-height: 1.65;">
+          <li><a href="/downloads">Abrir página de Downloads</a> — use a versão web instantaneamente ou baixe o app desktop completo.</li>
+          <li>A versão web (neste mesmo endereço) já funciona bem para catálogo e TV (Rede Buzz).</li>
+          <li>O app desktop (Electron) oferece a melhor experiência em canais ao vivo (teclado + autoplay).</li>
+        </ul>
+        <p class="settings-form__hint">
+          Depois de instalar/atualizar em outro computador, não esqueça de configurar sua chave do TMDB novamente.
+        </p>
+      </section>
+
+      <!-- Sprint 5: Cache stats e limpeza -->
+      <section class="settings-help" style="margin-top: var(--space-xl);">
+        <h2 class="settings-help__title">Cache (banco de dados)</h2>
+        <div id="cache-status" class="settings-form__status" style="margin-bottom: 0.5rem;">Carregando status do cache...</div>
+        <div style="display: flex; gap: var(--space-xs); flex-wrap: wrap;">
+          <button id="cache-refresh" class="btn btn--ghost">Atualizar status</button>
+          <button id="cache-clear-expired" class="btn btn--ghost">Limpar expirados</button>
+          <button id="cache-clear-all" class="btn btn--ghost" style="color: var(--color-accent);">Limpar TUDO</button>
+        </div>
+        <p class="settings-form__hint" style="margin-top: 0.5rem;">
+          Limpeza afeta metadados TMDB e respostas cacheadas. Imagens permanecem em disco.
+        </p>
+        <script>
+          (function () {
+            const statusEl = document.getElementById('cache-status');
+            async function loadStats() {
+              try {
+                const r = await fetch('/api/cache/stats');
+                const d = await r.json();
+                statusEl.textContent = `Driver: ${d.driver} · API cache: ${d.api_cache_count} · Metadados: ${d.media_metadata_count}`;
+                statusEl.className = 'settings-form__status settings-form__status--ok';
+              } catch {
+                statusEl.textContent = 'Não foi possível obter stats do cache.';
+                statusEl.className = 'settings-form__status settings-form__status--warn';
+              }
+            }
+            document.getElementById('cache-refresh').addEventListener('click', loadStats);
+            document.getElementById('cache-clear-expired').addEventListener('click', async () => {
+              statusEl.textContent = 'Limpando expirados...';
+              await fetch('/api/cache/clear', {method: 'POST'});
+              loadStats();
+            });
+            document.getElementById('cache-clear-all').addEventListener('click', async () => {
+              if (!confirm('Limpar TODO o cache?')) return;
+              statusEl.textContent = 'Limpando tudo...';
+              await fetch('/api/cache/clear?all=1', {method: 'POST'});
+              loadStats();
+            });
+            loadStats();
+          })();
+        </script>
+      </section>
     </main>
 
     <script>

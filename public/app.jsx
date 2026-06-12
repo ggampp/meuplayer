@@ -729,6 +729,7 @@ function App() {
   const [doramaLoading, setDoramaLoading] = useState(false);
   const [tmdbConfigured, setTmdbConfigured] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
+  const [liveQuick, setLiveQuick] = useState([]);
   const metaMapRef = useRef({});
   const modalChromeTimerRef = useRef(null);
 
@@ -744,6 +745,29 @@ function App() {
     } catch (e) {
       setHistoryItems([]);
     }
+  };
+
+  // Sprint 2: Carrega canais rápidos para o dashboard unificado (usa unified API do Sprint 4)
+  const loadLiveQuick = async () => {
+    try {
+      const res = await fetch("/api/channels/unified");
+      const data = await res.json();
+      const items = (data.data || []).slice(0, 6);
+      setLiveQuick(items);
+    } catch {
+      // Fallback para locais
+      try {
+        const res = await fetch("/canais.json");
+        const items = await res.json();
+        setLiveQuick((items || []).slice(0, 6).map(c => ({...c, source: "local"})));
+      } catch {}
+    }
+  };
+
+  const openLiveChannel = (channel) => {
+    if (!channel || !channel.id) return;
+    const url = `/rede-buzz?canal=${encodeURIComponent(channel.id)}`;
+    window.location.href = url;
   };
 
   const savePlaybackProgress = (item, season = "1", episode = "1") => {
@@ -783,6 +807,7 @@ function App() {
 
   useEffect(() => {
     loadHistory();
+    loadLiveQuick();
   }, [modal.open]);
 
   useEffect(() => {
@@ -2112,6 +2137,36 @@ function App() {
                       compact
                     />
                   ))}
+                </div>
+              </section>
+            )}
+
+            {/* Sprint 2: Seção unificada TV ao Vivo no Home (acesso rápido para dupla função) */}
+            {(!searchResults && !genreResults) && (liveQuick.length > 0 || true) && (
+              <section className="row" aria-labelledby="row-live">
+                <header className="row__header">
+                  <h2 className="row__title" id="row-live">TV ao Vivo</h2>
+                  <span className="row__status">Canais rápidos · <a href="/rede-buzz" style={{color: 'var(--color-accent)'}}>Abrir TV completa</a></span>
+                </header>
+                <div className="row__grid">
+                  {liveQuick.length > 0 ? liveQuick.map((ch, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="card card--compact"
+                      onClick={() => openLiveChannel(ch)}
+                      style={{textAlign: 'left', cursor: 'pointer'}}
+                    >
+                      <div style={{padding: '0.5rem 0.75rem'}}>
+                        <div style={{fontWeight: 600}}>{ch.nome || ch.id}</div>
+                        <small style={{opacity: 0.7}}>{ch.source === 'local' ? 'Local' : 'Rede Buzz'}</small>
+                      </div>
+                    </button>
+                  )) : (
+                    <button className="btn btn--primary" onClick={() => window.location.href = '/rede-buzz'}>
+                      Abrir TV ao Vivo
+                    </button>
+                  )}
                 </div>
               </section>
             )}

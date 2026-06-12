@@ -30,5 +30,13 @@
     ></script>
     <script src="/app.js"></script>
     <script src="/spatial-nav.js"></script>
+    <script>
+      // PWA registration (Sprint 5) - basic shell caching for web version
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

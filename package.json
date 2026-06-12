@@ -33,6 +33,11 @@
         "filter": ["**/*", "!cache/**", "!app.jsx"]
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "seu-usuario",
+      "repo": "meuplayer"
+    },
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] },
