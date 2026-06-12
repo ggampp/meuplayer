@@ -134,9 +134,10 @@ O MeuPlayer foi projetado para ser acessível de qualquer máquina:
    Funciona em qualquer navegador moderno. Catálogo completo + Rede Buzz já estão disponíveis.
 
 2. **Aplicativo Desktop completo**  
-   Baixe a versão portable ou instalador em:
-   - `/downloads` dentro do próprio app (quando estiver rodando a versão web), ou
-   - GitHub Releases (configure `owner/repo` no `package.json` e publique os builds gerados com `npm run build:win` / `build:linux`).
+   Baixe a versão portable ou instalador **diretamente no site** (sem redirecionar para GitHub):
+   - `/downloads` (hospedado no próprio VPS — coloque os arquivos gerados em `public/downloads/` após o build e redeploy via forja).
+   - O Portable é o mais recomendado para uso pessoal em vários PCs.
+   - Alternativa: GitHub Releases (atualize `owner/repo` no `package.json`).
 
 A experiência mais completa (especialmente troca de canais por setas do teclado e simulação de play) acontece no app Electron. A versão web degrada graciosamente com avisos claros nas páginas de TV.
 

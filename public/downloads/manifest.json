@@ -5,22 +5,21 @@
     {
       "platform": "Windows Portable",
       "recommended": true,
-      "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
-      "note": "Melhor para uso pessoal. Execute direto, sem instalação."
+      "url": "/downloads/MeuPlayer-Portable.exe",
+      "note": "Melhor para uso pessoal. Execute direto, sem instalação. Hospedado neste site."
     },
     {
-      "platform": "Windows Installer",
-      "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
-      "note": "Instalador completo com atalhos."
-    },
-    {
-      "platform": "Linux AppImage",
-      "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
-      "note": "Portable para Linux."
+      "platform": "Windows Installer (NSIS)",
+      "url": "/downloads/MeuPlayer-Setup.exe",
+      "note": "Instalador completo com atalhos. Hospedado neste site."
     }
   ],
   "web": {
     "url": "/",
     "note": "Versão web instantânea em qualquer computador (recomendada para uso rápido)."
+  },
+  "github": {
+    "url": "https://github.com/seu-usuario/meuplayer/releases/latest",
+    "note": "Versões alternativas (GitHub) - use apenas se os arquivos acima não estiverem atualizados."
   }
 }

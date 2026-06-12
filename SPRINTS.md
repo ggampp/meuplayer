@@ -156,8 +156,9 @@ Tornar o processo de disponibilizar novas versões no site confiável, bonito e 
 - Possibilidade de espelhar artefatos no VPS ou linkar GitHub Releases.
 
 **Tarefas principais**
-- Refinar `public/downloads.html` (versão + data, botões bonitos, fallback para GitHub).
-- Criar um `public/downloads/manifest.json` simples que pode ser atualizado manualmente.
+- Refinar `public/downloads.html` e manifest para servir os executáveis **diretamente no site** (sem redirecionamento obrigatório para GitHub).
+- Criar um `public/downloads/manifest.json` com links locais relativos (`/downloads/MeuPlayer-Portable.exe` etc.).
+- Adicionar `public/downloads/*` ao `.gitignore` (binários grandes não vão pro git).
 - Melhorar scripts de build para copiar artefatos automaticamente para uma pasta de staging (ou documentar o passo manual).
 - Adicionar suporte no Go para servir arquivos de uma pasta `DOWNLOADS_DIR` configurável (opcional, para maior flexibilidade).
 - Criar release no GitHub com todos os artefatos.
@@ -165,8 +166,9 @@ Tornar o processo de disponibilizar novas versões no site confiável, bonito e 
 - Documentar o fluxo completo em README ou em um arquivo `RELEASE.md`.
 
 **Critérios de aceite**
-- Após um build, é possível disponibilizar a nova versão no site em menos de 10 minutos de trabalho manual.
-- A página `/downloads` mostra informações úteis e links funcionais.
+- Após um build (`npm run build:win`), copie os arquivos para `public/downloads/` (com nomes padrão) e após redeploy, os executáveis Windows ficam disponíveis **diretamente no site** via `/downloads` (sem precisar ir ao GitHub).
+- A página `/downloads` prioriza links locais e mostra claramente que é hospedagem própria.
+- `public/downloads/*` não vai para o git.
 
 ---
 

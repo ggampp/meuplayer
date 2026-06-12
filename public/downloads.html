@@ -69,10 +69,23 @@
         <div style="display: grid; gap: var(--space-md); max-width: 720px;">
           <div id="downloads-list">Carregando downloads...</div>
 
+          <!-- Links diretos de fallback (caso o JS não carregue o manifest) -->
+          <div id="direct-downloads" style="display: none;">
+            <div class="settings-form" style="padding: var(--space-md);">
+              <strong>Windows Portable — Recomendado</strong>
+              <div class="settings-form__hint" style="margin-top: 4px;">Execute direto, sem instalação. Hospedado neste site.</div>
+              <a class="btn btn--primary" href="/downloads/MeuPlayer-Portable.exe" download style="margin-top: 0.5rem;">Baixar Portable</a>
+            </div>
+            <div class="settings-form" style="padding: var(--space-md);">
+              <strong>Windows Installer</strong>
+              <div class="settings-form__hint" style="margin-top: 4px;">Instalador com atalhos. Hospedado neste site.</div>
+              <a class="btn btn--ghost" href="/downloads/MeuPlayer-Setup.exe" download style="margin-top: 0.5rem;">Baixar Instalador</a>
+            </div>
+          </div>
+
           <p class="settings-form__hint" style="margin-top: var(--space-sm);">
-            Os links acima apontam para a última release no GitHub.<br>
-            Atualize o owner/repo no package.json e gere novas releases com <code>npm run build:win</code> (ou linux/mac).
-            Coloque os arquivos em <code>public/downloads/</code> (ignorados pelo git) para hospedagem própria.
+            Os executáveis abaixo são hospedados <strong>diretamente neste site</strong> (sem redirecionar para o GitHub).<br>
+            Gere com <code>npm run build:win</code>, copie os arquivos de <code>dist/</code> para <code>public/downloads/</code> (pasta ignorada pelo git) e redeploy via forja.
           </p>
         </div>
 
@@ -89,6 +102,10 @@
                 let html = '';
                 manifest.downloads.forEach(d => {
                   const rec = d.recommended ? ' — Recomendado' : '';
+                  const isLocal = d.url && d.url.startsWith('/');
+                  const linkAttrs = isLocal 
+                    ? `href="${d.url}" download` 
+                    : `href="${d.url}" target="_blank" rel="noopener"`;
                   html += `
                     <div class="settings-form" style="padding: var(--space-md);">
                       <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-wrap: wrap;">
@@ -96,7 +113,7 @@
                           <strong>${d.platform}${rec}</strong>
                           <div class="settings-form__hint" style="margin-top: 4px;">${d.note || ''}</div>
                         </div>
-                        <a class="btn ${d.recommended ? 'btn--primary' : 'btn--ghost'}" href="${d.url}" target="_blank" rel="noopener">Baixar</a>
+                        <a class="btn ${d.recommended ? 'btn--primary' : 'btn--ghost'}" ${linkAttrs}>Baixar</a>
                       </div>
                     </div>`;
                 });
@@ -106,26 +123,48 @@
                       <a class="btn btn--primary" href="${manifest.web.url}">${manifest.web.note || 'Usar versão web agora'}</a>
                     </div>`;
                 }
+                if (manifest.github && manifest.github.url) {
+                  html += `
+                    <div style="margin-top: var(--space-sm);">
+                      <a class="btn btn--ghost" href="${manifest.github.url}" target="_blank" rel="noopener" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                        Versões alternativas no GitHub →
+                      </a>
+                    </div>`;
+                }
                 container.innerHTML = html;
               })
               .catch(() => {
-                container.innerHTML = '<a class="btn btn--primary" href="https://github.com/seu-usuario/meuplayer/releases/latest" target="_blank">Ver releases no GitHub</a>';
+                container.innerHTML = `
+                  <div class="settings-form" style="padding: var(--space-md);">
+                    <strong>Windows Portable (recomendado)</strong>
+                    <a class="btn btn--primary" href="/downloads/MeuPlayer-Portable.exe" download style="margin-top:0.5rem">Baixar direto do site</a>
+                  </div>
+                  <div style="margin-top: var(--space-sm);">
+                    <a class="btn btn--ghost" href="https://github.com/seu-usuario/meuplayer/releases/latest" target="_blank" rel="noopener" style="font-size: 0.85rem;">Ou ver no GitHub</a>
+                  </div>
+                `;
               });
           })();
         </script>
       </section>
 
       <section class="settings-help" style="margin-top: var(--space-2xl);">
-        <h2 class="settings-help__title">Como atualizar os downloads no seu site</h2>
+        <h2 class="settings-help__title">Como disponibilizar o executável direto no site (sem GitHub)</h2>
         <ol style="line-height: 1.7; color: var(--color-ink-2);">
-          <li>Faça o build: <code>npm run build:win</code> (ou linux).</li>
-          <li>Os artefatos ficam em <code>dist/</code>.</li>
-          <li>Coloque os arquivos desejados em <code>public/downloads/</code> (esta pasta é ignorada pelo git).</li>
-          <li>Ou simplesmente atualize os links acima apontando para a sua release mais recente.</li>
-          <li>Rebuild e redeploy do Docker para que a página /downloads reflita as mudanças.</li>
+          <li>Execute o build: <code>npm run build:win</code></li>
+          <li>Os arquivos gerados ficam em <code>dist/</code> (ex: "MeuPlayer Setup 1.0.0.exe" e "MeuPlayer 1.0.0.exe").</li>
+          <li>Copie/renomeie para nomes consistentes:
+            <ul style="margin: 0.3rem 0 0.3rem 1.2rem; font-size: 0.9rem;">
+              <li><code>dist/MeuPlayer 1.0.0.exe</code> → <code>public/downloads/MeuPlayer-Portable.exe</code></li>
+              <li><code>dist/MeuPlayer Setup 1.0.0.exe</code> → <code>public/downloads/MeuPlayer-Setup.exe</code></li>
+            </ul>
+          </li>
+          <li>Os arquivos em <code>public/downloads/</code> são ignorados pelo git (veja .gitignore).</li>
+          <li>Sincronize a pasta para o VPS (via seu fluxo do forja ou scp/rsync) e faça redeploy.</li>
+          <li>A página /downloads vai servir os arquivos diretamente (sem redirecionar para GitHub).</li>
         </ol>
         <p class="settings-form__hint" style="margin-top: var(--space-sm);">
-          Dica: o arquivo <strong>portable</strong> é o mais conveniente para uso pessoal em vários computadores.
+          Dica: o <strong>Portable</strong> é o mais prático para uso em múltiplos computadores (só baixa e roda).
         </p>
       </section>
     </main>
