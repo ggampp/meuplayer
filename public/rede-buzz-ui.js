@@ -65,6 +65,7 @@
     const overlay = document.getElementById("playerOverlay");
     const channelUp = document.getElementById("channelUp");
     const channelDown = document.getElementById("channelDown");
+    const switchSourceBtn = document.getElementById("switchSource");
     const status = document.getElementById("channelsStatus");
     const searchInput = document.getElementById("channelSearch");
     const categorySelect = document.getElementById("channelCategory");
@@ -142,6 +143,7 @@
       url.searchParams.set("canal", channel.id);
       window.history.replaceState({}, "", url);
 
+      if (switchSourceBtn) switchSourceBtn.hidden = false;
       updateFavoriteButton();
       showOverlay();
     }
@@ -203,6 +205,7 @@
             : "Nenhum canal encontrado.";
         player.removeAttribute("src");
         if (favToggleBtn) favToggleBtn.hidden = true;
+        if (switchSourceBtn) switchSourceBtn.hidden = true;
         return;
       }
 
@@ -391,6 +394,18 @@
 
     channelUp.addEventListener("click", () => selectAdjacentChannel(-1));
     channelDown.addEventListener("click", () => selectAdjacentChannel(1));
+
+    function goToCanaisSource() {
+      const channel = channelList[activeIndex];
+      if (!channel || !channel.id) return;
+      // Abre o mesmo canal na página Canais, usando o mesmo identificador
+      // como referência para alternar a fonte de transmissão.
+      global.location.href = `/canais.html?canal=${encodeURIComponent(channel.id)}`;
+    }
+
+    if (switchSourceBtn) {
+      switchSourceBtn.addEventListener("click", goToCanaisSource);
+    }
 
     if (mobileSelect) {
       mobileSelect.addEventListener("change", () => {
