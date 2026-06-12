@@ -1597,7 +1597,7 @@ func handleCacheStats(w http.ResponseWriter, r *http.Request) {
 // API: Limpar cache expirado ou tudo (Sprint 5) - simples para uso pessoal
 func handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 	if DbCache == nil {
