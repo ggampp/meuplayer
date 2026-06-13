@@ -38,6 +38,7 @@ function getRouteTypeFromPath(pathname) {
   return ROUTE_TO_TYPE[firstSegment] || null;
 }
 const ROUTE_TYPE = window.MEUPLAYER_ROUTE || getRouteTypeFromPath(window.location.pathname);
+const NETFLIX_LAYOUT = typeof window !== "undefined" && window.MEUPLAYER_LAYOUT === "netflix";
 function mediaTypeToRoute(type) {
   if (type === "movie") return "filme";
   if (type === "anime") return "anime";
@@ -292,6 +293,62 @@ function GridRow({
     className: "row__more",
     onClick: onMore
   }, "Mais ", title.toLowerCase()) : null);
+}
+function Carousel({
+  title,
+  eyebrow,
+  status,
+  items,
+  onSelect,
+  hasMore,
+  onMore
+}) {
+  const trackRef = useRef(null);
+  const scrollByPage = direction => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollBy({
+      left: direction * el.clientWidth * 0.85,
+      behavior: "smooth"
+    });
+  };
+  return /*#__PURE__*/React.createElement("section", {
+    className: "nf-row",
+    "aria-labelledby": `nf-row-${title}`
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "nf-row__header"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "nf-row__title",
+    id: `nf-row-${title}`
+  }, title), eyebrow ? /*#__PURE__*/React.createElement("span", {
+    className: "nf-row__status"
+  }, eyebrow) : null), items.length ? /*#__PURE__*/React.createElement("div", {
+    className: "nf-row__viewport"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "nf-row__arrow nf-row__arrow--left",
+    onClick: () => scrollByPage(-1),
+    "aria-label": "Anterior"
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    className: "nf-row__track",
+    ref: trackRef
+  }, items.map(item => /*#__PURE__*/React.createElement(MediaCard, {
+    key: `${item.type}-${item.id}`,
+    item: item,
+    meta: item.meta || {},
+    onSelect: onSelect
+  })), hasMore ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "nf-row__more-card",
+    onClick: onMore
+  }, "Mais", /*#__PURE__*/React.createElement("br", null), title.toLowerCase(), " \u2192") : null), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "nf-row__arrow nf-row__arrow--right",
+    onClick: () => scrollByPage(1),
+    "aria-label": "Pr\xF3ximo"
+  }, "\u203A")) : /*#__PURE__*/React.createElement("div", {
+    className: "row__empty"
+  }, status || "Nenhum item encontrado."));
 }
 function CastCard({
   member,
@@ -782,6 +839,11 @@ function App() {
     document.body.classList.toggle("filters-open", filterPanelOpen);
     return () => document.body.classList.remove("filters-open");
   }, [filterPanelOpen]);
+  useEffect(() => {
+    if (!NETFLIX_LAYOUT) return;
+    document.body.classList.add("layout-netflix");
+    return () => document.body.classList.remove("layout-netflix");
+  }, []);
   const hideModalChromeSoon = (delay = 3200) => {
     if (modalChromeTimerRef.current) {
       clearTimeout(modalChromeTimerRef.current);
@@ -1230,6 +1292,9 @@ function App() {
     }
   };
   const syncUrl = (item, replace = false) => {
+    // No layout Netflix os detalhes abrem como overlay sobre a /netflix,
+    // então não reescrevemos o caminho para as páginas dedicadas.
+    if (NETFLIX_LAYOUT) return;
     const path = item && item.id ? `/${mediaTypeToRoute(item.type)}/${item.id}` : ROUTE_TYPE ? `/${mediaTypeToRoute(ROUTE_TYPE)}` : "/";
     if (replace) {
       window.history.replaceState({}, "", path);
@@ -1434,6 +1499,9 @@ function App() {
   if (modal.open) {
     return renderModal();
   }
+  if (NETFLIX_LAYOUT) {
+    return renderNetflixHome();
+  }
   if (selectedPerson) {
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(PersonDetail, {
       person: selectedPerson,
@@ -1443,7 +1511,8 @@ function App() {
       onSelectWork: openWorkFromPerson
     }), renderModal());
   }
-  if (selected) {
+  function renderDetail() {
+    if (!selected) return null;
     const title = selectedMeta?.title || selectedMeta?.name || selected.id;
     const subtitle = selectedMeta?.original_title || selectedMeta?.original_name || "Título original não informado";
     const year = pickYear(selectedMeta);
@@ -1451,7 +1520,7 @@ function App() {
     const runtime = selectedMeta?.runtime || selectedMeta?.episode_run_time?.[0] || null;
     const backdropPath = selectedMeta?.backdrop_path ? `${BACKDROP_BASE}${selectedMeta.backdrop_path}` : "";
     const posterPath = selectedMeta?.poster_path ? `${IMAGE_BASE}${selectedMeta.poster_path}` : "";
-    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("article", {
+    return /*#__PURE__*/React.createElement("article", {
       className: "detail"
     }, /*#__PURE__*/React.createElement("div", {
       className: "detail__backdrop",
@@ -1581,7 +1650,10 @@ function App() {
       meta: item.meta || {},
       onSelect: openDetail,
       compact: true
-    })))) : null))), renderModal());
+    })))) : null));
+  }
+  if (selected) {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("main", null, renderDetail()), renderModal());
   }
   function renderModal() {
     const backToDetailLabel = modal.type === "movie" ? "Voltar aos detalhes do filme" : "Voltar aos detalhes";
@@ -1781,29 +1853,122 @@ function App() {
       "aria-label": "Selecionar episodio"
     }))) : null)));
   }
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(CatalogFilters, {
-    search: search,
-    onSearchChange: setSearch,
-    genreFilter: genreFilter,
-    onGenreChange: setGenreFilter,
-    genreOptions: genreOptions,
-    status: rowsLabel,
-    yearFilter: yearFilter,
-    onYearChange: setYearFilter,
-    statusFilter: statusFilter,
-    onStatusChange: setStatusFilter,
-    networkFilter: networkFilter,
-    onNetworkChange: setNetworkFilter,
-    panelOpen: filterPanelOpen,
-    onTogglePanel: () => setFilterPanelOpen(v => !v),
-    onClear: () => {
-      setSearch("");
-      setGenreFilter("all");
-      setYearFilter("");
-      setStatusFilter("all");
-      setNetworkFilter("all");
-    }
-  }), /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement(Hero, {
+  function renderCatalogFilters() {
+    return /*#__PURE__*/React.createElement(CatalogFilters, {
+      search: search,
+      onSearchChange: setSearch,
+      genreFilter: genreFilter,
+      onGenreChange: setGenreFilter,
+      genreOptions: genreOptions,
+      status: rowsLabel,
+      yearFilter: yearFilter,
+      onYearChange: setYearFilter,
+      statusFilter: statusFilter,
+      onStatusChange: setStatusFilter,
+      networkFilter: networkFilter,
+      onNetworkChange: setNetworkFilter,
+      panelOpen: filterPanelOpen,
+      onTogglePanel: () => setFilterPanelOpen(v => !v),
+      onClear: () => {
+        setSearch("");
+        setGenreFilter("all");
+        setYearFilter("");
+        setStatusFilter("all");
+        setNetworkFilter("all");
+      }
+    });
+  }
+  function renderNetflixHome() {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, renderCatalogFilters(), /*#__PURE__*/React.createElement("main", {
+      className: "nf"
+    }, /*#__PURE__*/React.createElement(Hero, {
+      featured: featured,
+      onWatch: openDetail
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "nf-rows"
+    }, historyItems.length > 0 && !searchResults && !genreResults && /*#__PURE__*/React.createElement(Carousel, {
+      title: "Continuar Assistindo",
+      eyebrow: "Seu hist\xF3rico de reprodu\xE7\xE3o",
+      items: historyItems.map(item => ({
+        ...item,
+        meta: item.meta || {},
+        __resume: {
+          season: item.season,
+          episode: item.episode
+        }
+      })),
+      onSelect: clicked => {
+        openDetail(clicked);
+        setTimeout(() => {
+          openModal(clicked, clicked.__resume?.season, clicked.__resume?.episode);
+        }, 200);
+      }
+    }), !searchResults && !genreResults && liveQuick.length > 0 && /*#__PURE__*/React.createElement("section", {
+      className: "nf-row",
+      "aria-labelledby": "nf-row-live"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "nf-row__header"
+    }, /*#__PURE__*/React.createElement("h2", {
+      className: "nf-row__title",
+      id: "nf-row-live"
+    }, "TV ao Vivo"), /*#__PURE__*/React.createElement("span", {
+      className: "nf-row__status"
+    }, "Canais r\xE1pidos \xB7", " ", /*#__PURE__*/React.createElement("a", {
+      href: "/rede-buzz",
+      style: {
+        color: "var(--color-accent)"
+      }
+    }, "Abrir TV completa"))), /*#__PURE__*/React.createElement("div", {
+      className: "nf-row__viewport"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "nf-row__track"
+    }, liveQuick.map((ch, idx) => /*#__PURE__*/React.createElement("button", {
+      key: idx,
+      type: "button",
+      className: "card card--compact nf-live-card",
+      onClick: () => openLiveChannel(ch)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "0.5rem 0.75rem"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600
+      }
+    }, ch.nome || ch.id), /*#__PURE__*/React.createElement("small", {
+      style: {
+        opacity: 0.7
+      }
+    }, ch.source === "local" ? "Local" : "Rede Buzz"))))))), filteredRows.map(row => /*#__PURE__*/React.createElement(Carousel, {
+      key: row.key,
+      title: row.title,
+      eyebrow: row.eyebrow,
+      status: rowsLabel,
+      items: row.items,
+      onSelect: openDetail,
+      hasMore: row.hasMore,
+      onMore: () => handleMore(row.key)
+    })))), selectedPerson ? /*#__PURE__*/React.createElement("div", {
+      className: "nf-detail-overlay",
+      role: "dialog",
+      "aria-modal": "true"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "nf-detail-overlay__scroll"
+    }, /*#__PURE__*/React.createElement(PersonDetail, {
+      person: selectedPerson,
+      data: personData,
+      hasParentDetail: Boolean(selected),
+      onBack: closePerson,
+      onSelectWork: openWorkFromPerson
+    }))) : selected ? /*#__PURE__*/React.createElement("div", {
+      className: "nf-detail-overlay",
+      role: "dialog",
+      "aria-modal": "true"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "nf-detail-overlay__scroll"
+    }, renderDetail())) : null, renderModal());
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, renderCatalogFilters(), /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement(Hero, {
     featured: featured,
     onWatch: openDetail
   }), /*#__PURE__*/React.createElement("section", {

@@ -37,7 +37,7 @@
     { label: 'Configurações', path: '/configuracoes' },
   ];
 
-  const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime', '/dorama']);
+  const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime', '/dorama', '/netflix']);
 
   const style = document.createElement('style');
   style.textContent = `
