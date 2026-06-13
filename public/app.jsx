@@ -26,6 +26,9 @@ function getRouteTypeFromPath(pathname) {
 
 const ROUTE_TYPE = window.MEUPLAYER_ROUTE || getRouteTypeFromPath(window.location.pathname);
 
+const NETFLIX_LAYOUT =
+  typeof window !== "undefined" && window.MEUPLAYER_LAYOUT === "netflix";
+
 function mediaTypeToRoute(type) {
   if (type === "movie") return "filme";
   if (type === "anime") return "anime";
@@ -298,6 +301,70 @@ function GridRow({ title, eyebrow, status, items, onSelect, hasMore, onMore }) {
           Mais {title.toLowerCase()}
         </button>
       ) : null}
+    </section>
+  );
+}
+
+function Carousel({ title, eyebrow, status, items, onSelect, hasMore, onMore }) {
+  const trackRef = useRef(null);
+
+  const scrollByPage = (direction) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * el.clientWidth * 0.85, behavior: "smooth" });
+  };
+
+  return (
+    <section className="nf-row" aria-labelledby={`nf-row-${title}`}>
+      <header className="nf-row__header">
+        <h2 className="nf-row__title" id={`nf-row-${title}`}>
+          {title}
+        </h2>
+        {eyebrow ? <span className="nf-row__status">{eyebrow}</span> : null}
+      </header>
+      {items.length ? (
+        <div className="nf-row__viewport">
+          <button
+            type="button"
+            className="nf-row__arrow nf-row__arrow--left"
+            onClick={() => scrollByPage(-1)}
+            aria-label="Anterior"
+          >
+            ‹
+          </button>
+          <div className="nf-row__track" ref={trackRef}>
+            {items.map((item) => (
+              <MediaCard
+                key={`${item.type}-${item.id}`}
+                item={item}
+                meta={item.meta || {}}
+                onSelect={onSelect}
+              />
+            ))}
+            {hasMore ? (
+              <button
+                type="button"
+                className="nf-row__more-card"
+                onClick={onMore}
+              >
+                Mais
+                <br />
+                {title.toLowerCase()} →
+              </button>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="nf-row__arrow nf-row__arrow--right"
+            onClick={() => scrollByPage(1)}
+            aria-label="Próximo"
+          >
+            ›
+          </button>
+        </div>
+      ) : (
+        <div className="row__empty">{status || "Nenhum item encontrado."}</div>
+      )}
     </section>
   );
 }
@@ -824,6 +891,12 @@ function App() {
     document.body.classList.toggle("filters-open", filterPanelOpen);
     return () => document.body.classList.remove("filters-open");
   }, [filterPanelOpen]);
+
+  useEffect(() => {
+    if (!NETFLIX_LAYOUT) return;
+    document.body.classList.add("layout-netflix");
+    return () => document.body.classList.remove("layout-netflix");
+  }, []);
 
   const hideModalChromeSoon = (delay = 3200) => {
     if (modalChromeTimerRef.current) {
@@ -1365,6 +1438,9 @@ function App() {
   };
 
   const syncUrl = (item, replace = false) => {
+    // No layout Netflix os detalhes abrem como overlay sobre a /netflix,
+    // então não reescrevemos o caminho para as páginas dedicadas.
+    if (NETFLIX_LAYOUT) return;
     const path = item && item.id
       ? `/${mediaTypeToRoute(item.type)}/${item.id}`
       : ROUTE_TYPE
@@ -1596,6 +1672,10 @@ function App() {
     return renderModal();
   }
 
+  if (NETFLIX_LAYOUT) {
+    return renderNetflixHome();
+  }
+
   if (selectedPerson) {
     return (
       <>
@@ -1611,7 +1691,8 @@ function App() {
     );
   }
 
-  if (selected) {
+  function renderDetail() {
+    if (!selected) return null;
     const title = selectedMeta?.title || selectedMeta?.name || selected.id;
     const subtitle =
       selectedMeta?.original_title ||
@@ -1631,8 +1712,6 @@ function App() {
       : "";
 
     return (
-      <>
-        <main>
           <article className="detail">
             <div
               className="detail__backdrop"
@@ -1828,8 +1907,13 @@ function App() {
               ) : null}
             </div>
           </article>
-        </main>
+    );
+  }
 
+  if (selected) {
+    return (
+      <>
+        <main>{renderDetail()}</main>
         {renderModal()}
       </>
     );
@@ -2086,8 +2170,8 @@ function App() {
     );
   }
 
-  return (
-    <>
+  function renderCatalogFilters() {
+    return (
       <CatalogFilters
         search={search}
         onSearchChange={setSearch}
@@ -2111,6 +2195,113 @@ function App() {
           setNetworkFilter("all");
         }}
       />
+    );
+  }
+
+  function renderNetflixHome() {
+    return (
+      <>
+        {renderCatalogFilters()}
+        <main className="nf">
+          <Hero featured={featured} onWatch={openDetail} />
+
+          <div className="nf-rows">
+            {historyItems.length > 0 && !searchResults && !genreResults && (
+              <Carousel
+                title="Continuar Assistindo"
+                eyebrow="Seu histórico de reprodução"
+                items={historyItems.map((item) => ({
+                  ...item,
+                  meta: item.meta || {},
+                  __resume: { season: item.season, episode: item.episode },
+                }))}
+                onSelect={(clicked) => {
+                  openDetail(clicked);
+                  setTimeout(() => {
+                    openModal(
+                      clicked,
+                      clicked.__resume?.season,
+                      clicked.__resume?.episode
+                    );
+                  }, 200);
+                }}
+              />
+            )}
+
+            {!searchResults && !genreResults && liveQuick.length > 0 && (
+              <section className="nf-row" aria-labelledby="nf-row-live">
+                <header className="nf-row__header">
+                  <h2 className="nf-row__title" id="nf-row-live">TV ao Vivo</h2>
+                  <span className="nf-row__status">
+                    Canais rápidos ·{" "}
+                    <a href="/rede-buzz" style={{ color: "var(--color-accent)" }}>
+                      Abrir TV completa
+                    </a>
+                  </span>
+                </header>
+                <div className="nf-row__viewport">
+                  <div className="nf-row__track">
+                    {liveQuick.map((ch, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="card card--compact nf-live-card"
+                        onClick={() => openLiveChannel(ch)}
+                      >
+                        <div style={{ padding: "0.5rem 0.75rem" }}>
+                          <div style={{ fontWeight: 600 }}>{ch.nome || ch.id}</div>
+                          <small style={{ opacity: 0.7 }}>
+                            {ch.source === "local" ? "Local" : "Rede Buzz"}
+                          </small>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {filteredRows.map((row) => (
+              <Carousel
+                key={row.key}
+                title={row.title}
+                eyebrow={row.eyebrow}
+                status={rowsLabel}
+                items={row.items}
+                onSelect={openDetail}
+                hasMore={row.hasMore}
+                onMore={() => handleMore(row.key)}
+              />
+            ))}
+          </div>
+        </main>
+
+        {selectedPerson ? (
+          <div className="nf-detail-overlay" role="dialog" aria-modal="true">
+            <div className="nf-detail-overlay__scroll">
+              <PersonDetail
+                person={selectedPerson}
+                data={personData}
+                hasParentDetail={Boolean(selected)}
+                onBack={closePerson}
+                onSelectWork={openWorkFromPerson}
+              />
+            </div>
+          </div>
+        ) : selected ? (
+          <div className="nf-detail-overlay" role="dialog" aria-modal="true">
+            <div className="nf-detail-overlay__scroll">{renderDetail()}</div>
+          </div>
+        ) : null}
+
+        {renderModal()}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {renderCatalogFilters()}
       <main>
         <Hero featured={featured} onWatch={openDetail} />
 
