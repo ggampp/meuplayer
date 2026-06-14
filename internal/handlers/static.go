@@ -1,12 +1,15 @@
-package main
+package handlers
 
 import (
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"meuplayer/internal/server"
 )
 
-func handleStaticOrSPA(w http.ResponseWriter, r *http.Request) {
+// HandleStaticOrSPA resolve rotas amigáveis da SPA e serve arquivos estáticos.
+func HandleStaticOrSPA(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
 	// Resolve rotas amigáveis da SPA
@@ -38,12 +41,10 @@ func handleStaticOrSPA(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if target != "" {
-		http.ServeFile(w, r, filepath.Join(StaticDir, target))
+		http.ServeFile(w, r, filepath.Join(server.StaticDir, target))
 		return
 	}
 
 	// Caso contrário, serve o arquivo estático diretamente
-	http.FileServer(http.Dir(StaticDir)).ServeHTTP(w, r)
+	http.FileServer(http.Dir(server.StaticDir)).ServeHTTP(w, r)
 }
-
-// API: Configurações

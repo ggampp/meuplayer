@@ -28,7 +28,14 @@ dist/
 
 # Project cache
 public/cache/
+cache.sqlite3
 cache.sqlite3-*
+
+# Binários do servidor compilados na raiz (mantém public/downloads/)
+/meuplayer.exe
+/meuplayer-server
+/meuplayer-server.exe
+/*.exe
 
 # public/downloads/ — mantido no Git de propósito (distribuição sem clone do repo)
 # OS

@@ -1,7 +1,7 @@
 # Sprints — índice
 
 **Projeto:** MeuPlayer (desktop + web + TV Box)  
-**Status geral:** Sprints 1–6 concluídas; Fases 4 (app.jsx) e 6 (raiz) planejadas.
+**Status geral:** Sprints 1–7 concluídas; Fase 4 (modularizar `app.jsx`) pendente.
 
 | Sprint | Tema | Spec | Summary |
 |--------|------|------|---------|

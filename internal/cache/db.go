@@ -1,4 +1,4 @@
-package main
+package cache
 
 import (
 	"database/sql"
@@ -43,6 +43,11 @@ func NewCacheDB(driver, dataSourceName string) (*CacheDB, error) {
 
 func (c *CacheDB) Close() error {
 	return c.db.Close()
+}
+
+// Driver retorna o driver em uso ("sqlite" ou "postgres").
+func (c *CacheDB) Driver() string {
+	return c.driver
 }
 
 func (c *CacheDB) query(sqlQuery string) string {
@@ -193,7 +198,7 @@ func (c *CacheDB) MediaMetadataSet(mediaKey, mediaType, tmdbID string, body []by
 	return err
 }
 
-// MediaMetadataList lista os últimos registros de metadados
+// MediaMetadataRow representa uma linha de metadados de mídia.
 type MediaMetadataRow struct {
 	MediaKey  string
 	MediaType string
@@ -202,6 +207,7 @@ type MediaMetadataRow struct {
 	UpdatedAt int64
 }
 
+// MediaMetadataList lista os últimos registros de metadados
 func (c *CacheDB) MediaMetadataList(limit int) ([]MediaMetadataRow, error) {
 	queryStr := c.query("SELECT media_key, media_type, tmdb_id, body, updated_at FROM media_metadata ORDER BY updated_at DESC LIMIT ?")
 	rows, err := c.db.Query(queryStr, limit)
@@ -219,4 +225,30 @@ func (c *CacheDB) MediaMetadataList(limit int) ([]MediaMetadataRow, error) {
 		results = append(results, r)
 	}
 	return results, nil
+}
+
+// Counts retorna a quantidade de registros em api_cache e media_metadata.
+func (c *CacheDB) Counts() (apiCount int, metaCount int, err error) {
+	if err = c.db.QueryRow(c.query("SELECT COUNT(*) FROM api_cache")).Scan(&apiCount); err != nil {
+		return 0, 0, err
+	}
+	if err = c.db.QueryRow(c.query("SELECT COUNT(*) FROM media_metadata")).Scan(&metaCount); err != nil {
+		return 0, 0, err
+	}
+	return apiCount, metaCount, nil
+}
+
+// CleanupExpired remove do cache de API os registros já expirados.
+func (c *CacheDB) CleanupExpired(now int64) error {
+	_, err := c.db.Exec(c.query("DELETE FROM api_cache WHERE expires_at <= ?"), now)
+	return err
+}
+
+// ClearAll remove todos os registros de cache de API e metadados.
+func (c *CacheDB) ClearAll() error {
+	if _, err := c.db.Exec(c.query("DELETE FROM api_cache")); err != nil {
+		return err
+	}
+	_, err := c.db.Exec(c.query("DELETE FROM media_metadata"))
+	return err
 }

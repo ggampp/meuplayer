@@ -30,7 +30,7 @@ Tarefa ativa: copiar trecho relevante para `docs/sprints/XXX-current.md` e apaga
 | Camada | Entrada principal | Notas |
 |--------|-------------------|--------|
 | Desktop | `main.js` | Electron, porta 8765 |
-| Servidor | `main.go`, `db.go`, `handlers_*.go`, `server_core.go` | Go, cache SQLite/Postgres |
+| Servidor | `cmd/server/main.go`, `internal/cache`, `internal/server`, `internal/handlers` | Go, cache SQLite/Postgres |
 | Frontend VOD | `public/app.jsx` → `public/app.js` | React 18 CDN + Babel |
 | TV / utilitários | `public/rede-buzz-ui.js`, `public/canais.html` | Workbench |
 | Estilos | `public/styles.css` → `@import public/css/*` | Design system em `design.md` |
@@ -43,12 +43,12 @@ Tarefa ativa: copiar trecho relevante para `docs/sprints/XXX-current.md` e apaga
 - `public/app.jsx` (modularização Fase 4 pendente) — usar `grep` por componente
 - `public/app.js` (gerado; editar só `app.jsx`)
 - `public/css/*.css` — ler o partial da feature
-- `handlers_tmdb.go` — buscar handler específico
+- `internal/handlers/tmdb.go` — buscar handler específico
 
 ## Verificação
 
 ```powershell
-go build .
+go build ./...
 npm run build:frontend
 ```
 

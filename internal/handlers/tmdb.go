@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -13,10 +13,28 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"meuplayer/internal/server"
 )
 
-func handleTmdbDetail(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// Tamanhos de imagem aceitos pelo proxy do TMDB.
+var allowedImageSizes = map[string]bool{
+	"w45": true, "w92": true, "w154": true, "w185": true,
+	"w300": true, "w342": true, "w500": true, "w780": true,
+	"w1280": true, "original": true,
+}
+
+// 1x1 GIF transparente usado como fallback de imagem.
+var placeholderGif = []byte{
+	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+	0x00, 0x02, 0x01, 0x44, 0x00, 0x3b,
+}
+
+// HandleTmdbDetail retorna detalhes de um título (com cache duplo e pré-download de imagens).
+func HandleTmdbDetail(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 
@@ -27,7 +45,7 @@ func handleTmdbDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	tmdbID := q.Get("id")
 	if tmdbID == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
 		return
 	}
 
@@ -39,7 +57,7 @@ func handleTmdbDetail(w http.ResponseWriter, r *http.Request) {
 	storageKey := fmt.Sprintf("%s:%s", tmdbMedia, tmdbID)
 
 	// 1. Tenta pegar metadados persistentes limpos
-	stored, err := DbCache.MediaMetadataGet(storageKey)
+	stored, err := server.DbCache.MediaMetadataGet(storageKey)
 	if err == nil && len(stored) > 0 {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("X-Cache", "STORE")
@@ -49,10 +67,10 @@ func handleTmdbDetail(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Tenta pegar do cache comum
 	cacheKey := fmt.Sprintf("tmdb:%s:%s:pt-BR", tmdbMedia, tmdbID)
-	status, contentType, body, expiresAt, err := DbCache.ApiCacheGet(cacheKey)
+	status, contentType, body, expiresAt, err := server.DbCache.ApiCacheGet(cacheKey)
 	if err == nil && expiresAt > time.Now().Unix() {
 		if status == http.StatusOK {
-			_ = DbCache.MediaMetadataSet(storageKey, tmdbMedia, tmdbID, body, time.Now().Unix())
+			_ = server.DbCache.MediaMetadataSet(storageKey, tmdbMedia, tmdbID, body, time.Now().Unix())
 			go warmTmdbImages(body)
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -63,28 +81,28 @@ func handleTmdbDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Busca no TMDB remoto
-	urlStr := fmt.Sprintf("%s/%s/%s?api_key=%s&language=pt-BR", TmdbBase, tmdbMedia, tmdbID, getTmdbApiKey())
+	urlStr := fmt.Sprintf("%s/%s/%s?api_key=%s&language=pt-BR", server.TmdbBase, tmdbMedia, tmdbID, server.GetTmdbApiKey())
 	client := http.Client{Timeout: 15 * time.Second}
 	req, _ := http.NewRequest("GET", urlStr, nil)
 	req.Header.Set("User-Agent", "MeuPlayer/1.0")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao acessar o TMDB", err.Error())
+		server.SendJSONError(w, http.StatusBadGateway, "Falha ao acessar o TMDB", err.Error())
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao ler resposta do TMDB", err.Error())
+		server.SendJSONError(w, http.StatusBadGateway, "Falha ao ler resposta do TMDB", err.Error())
 		return
 	}
 
 	if resp.StatusCode == http.StatusOK {
 		now := time.Now().Unix()
-		_ = DbCache.ApiCacheSet(cacheKey, resp.StatusCode, "application/json; charset=utf-8", respBody, now+TtlTmdbDetailsSeconds, now)
-		_ = DbCache.MediaMetadataSet(storageKey, tmdbMedia, tmdbID, respBody, now)
+		_ = server.DbCache.ApiCacheSet(cacheKey, resp.StatusCode, "application/json; charset=utf-8", respBody, now+server.TtlTmdbDetailsSeconds, now)
+		_ = server.DbCache.MediaMetadataSet(storageKey, tmdbMedia, tmdbID, respBody, now)
 		go warmTmdbImages(respBody)
 	}
 
@@ -94,7 +112,7 @@ func handleTmdbDetail(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(respBody)
 }
 
-// Pre-fetch de Imagens do TMDB (Posters e Backdrops) em background
+// warmTmdbImages faz o pré-download de pôsteres e backdrops em background.
 func warmTmdbImages(metaBytes []byte) {
 	var meta map[string]interface{}
 	if err := json.Unmarshal(metaBytes, &meta); err != nil {
@@ -115,12 +133,12 @@ func warmTmdbImages(metaBytes []byte) {
 			size = "w1280"
 		}
 		relPath = strings.TrimLeft(relPath, "/")
-		localPath := filepath.Join(ImageCacheDir, size, relPath)
+		localPath := filepath.Join(server.ImageCacheDir, size, relPath)
 		if _, err := os.Stat(localPath); err == nil {
 			continue // Já baixado
 		}
 
-		remoteUrl := fmt.Sprintf("%s/%s/%s", TmdbImageBase, size, relPath)
+		remoteUrl := fmt.Sprintf("%s/%s/%s", server.TmdbImageBase, size, relPath)
 		client := http.Client{Timeout: 20 * time.Second}
 		req, _ := http.NewRequest("GET", remoteUrl, nil)
 		req.Header.Set("User-Agent", "MeuPlayer/1.0")
@@ -144,9 +162,9 @@ func warmTmdbImages(metaBytes []byte) {
 	}
 }
 
-// TMDB: Genres
-func handleTmdbGenres(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbGenres retorna a lista de gêneros do TMDB.
+func HandleTmdbGenres(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	mediaType := r.URL.Query().Get("type")
@@ -155,20 +173,20 @@ func handleTmdbGenres(w http.ResponseWriter, r *http.Request) {
 		tmdbMedia = "tv"
 	}
 	cacheKey := fmt.Sprintf("genres:%s:pt-BR", tmdbMedia)
-	urlStr := fmt.Sprintf("%s/genre/%s/list?api_key=%s&language=pt-BR", TmdbBase, tmdbMedia, getTmdbApiKey())
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbGenresSeconds, nil)
+	urlStr := fmt.Sprintf("%s/genre/%s/list?api_key=%s&language=pt-BR", server.TmdbBase, tmdbMedia, server.GetTmdbApiKey())
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbGenresSeconds, nil)
 }
 
-// TMDB: Search
-func handleTmdbSearch(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbSearch pesquisa títulos no TMDB.
+func HandleTmdbSearch(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
 	mediaType := q.Get("type")
 	term := q.Get("query")
 	if term == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro query é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro query é obrigatório", "")
 		return
 	}
 
@@ -178,13 +196,13 @@ func handleTmdbSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	cacheKey := fmt.Sprintf("search:%s:%s:pt-BR", tmdbMedia, strings.ToLower(term))
 	urlStr := fmt.Sprintf("%s/search/%s?api_key=%s&language=pt-BR&query=%s&include_adult=false&page=1",
-		TmdbBase, tmdbMedia, getTmdbApiKey(), url.QueryEscape(term))
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbSearchSeconds, nil)
+		server.TmdbBase, tmdbMedia, server.GetTmdbApiKey(), url.QueryEscape(term))
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbSearchSeconds, nil)
 }
 
-// TMDB: Discover
-func handleTmdbDiscover(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbDiscover descobre títulos por gênero e/ou idioma.
+func HandleTmdbDiscover(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
@@ -197,14 +215,14 @@ func handleTmdbDiscover(w http.ResponseWriter, r *http.Request) {
 	originalLanguage := strings.ToLower(strings.TrimSpace(q.Get("original_language")))
 
 	if genreID == "" && originalLanguage == "" {
-		sendJSONError(w, http.StatusBadRequest, "Informe genre e/ou original_language", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Informe genre e/ou original_language", "")
 		return
 	}
 
 	if originalLanguage != "" {
 		matched, _ := regexp.MatchString("^[a-z]{2}$", originalLanguage)
 		if !matched {
-			sendJSONError(w, http.StatusBadRequest, "Parâmetro original_language inválido", "")
+			server.SendJSONError(w, http.StatusBadRequest, "Parâmetro original_language inválido", "")
 			return
 		}
 	}
@@ -248,39 +266,39 @@ func handleTmdbDiscover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	urlStr := fmt.Sprintf("%s/discover/%s?api_key=%s&language=pt-BR%s&include_adult=false&sort_by=%s%s%s&page=%s",
-		TmdbBase, tmdbMedia, getTmdbApiKey(), genreFilter, sortBy, dateFilter, langFilter, url.QueryEscape(page))
+		server.TmdbBase, tmdbMedia, server.GetTmdbApiKey(), genreFilter, sortBy, dateFilter, langFilter, url.QueryEscape(page))
 
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbSearchSeconds, nil)
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbSearchSeconds, nil)
 }
 
-// TMDB: Season
-func handleTmdbSeason(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbSeason retorna os episódios de uma temporada.
+func HandleTmdbSeason(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
 	tmdbID := q.Get("id")
 	seasonNumber := q.Get("season")
 	if tmdbID == "" || seasonNumber == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetros id e season são obrigatórios", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetros id e season são obrigatórios", "")
 		return
 	}
 
 	cacheKey := fmt.Sprintf("season:%s:%s:pt-BR", tmdbID, seasonNumber)
-	urlStr := fmt.Sprintf("%s/tv/%s/season/%s?api_key=%s&language=pt-BR", TmdbBase, tmdbID, seasonNumber, getTmdbApiKey())
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbSeasonSeconds, nil)
+	urlStr := fmt.Sprintf("%s/tv/%s/season/%s?api_key=%s&language=pt-BR", server.TmdbBase, tmdbID, seasonNumber, server.GetTmdbApiKey())
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbSeasonSeconds, nil)
 }
 
-// TMDB: Related (Recommendations)
-func handleTmdbRelated(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbRelated retorna recomendações relacionadas.
+func HandleTmdbRelated(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
 	mediaType := q.Get("type")
 	tmdbID := q.Get("id")
 	if tmdbID == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
 		return
 	}
 
@@ -290,20 +308,20 @@ func handleTmdbRelated(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheKey := fmt.Sprintf("related:%s:%s:pt-BR", tmdbMedia, tmdbID)
-	urlStr := fmt.Sprintf("%s/%s/%s/recommendations?api_key=%s&language=pt-BR&page=1", TmdbBase, tmdbMedia, tmdbID, getTmdbApiKey())
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbRelatedSeconds, nil)
+	urlStr := fmt.Sprintf("%s/%s/%s/recommendations?api_key=%s&language=pt-BR&page=1", server.TmdbBase, tmdbMedia, tmdbID, server.GetTmdbApiKey())
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbRelatedSeconds, nil)
 }
 
-// TMDB: Credits (Elenco)
-func handleTmdbCredits(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbCredits retorna o elenco de um título.
+func HandleTmdbCredits(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
 	mediaType := q.Get("type")
 	tmdbID := q.Get("id")
 	if tmdbID == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
 		return
 	}
 
@@ -313,47 +331,47 @@ func handleTmdbCredits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheKey := fmt.Sprintf("credits:%s:%s:pt-BR", tmdbMedia, tmdbID)
-	urlStr := fmt.Sprintf("%s/%s/%s/credits?api_key=%s&language=pt-BR", TmdbBase, tmdbMedia, tmdbID, getTmdbApiKey())
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbDetailsSeconds, nil)
+	urlStr := fmt.Sprintf("%s/%s/%s/credits?api_key=%s&language=pt-BR", server.TmdbBase, tmdbMedia, tmdbID, server.GetTmdbApiKey())
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbDetailsSeconds, nil)
 }
 
-// TMDB: Person (Detalhes do Ator)
-func handleTmdbPerson(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbPerson retorna os detalhes de um ator.
+func HandleTmdbPerson(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
 	personID := q.Get("id")
 	if personID == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
 		return
 	}
 
 	cacheKey := fmt.Sprintf("person:%s:pt-BR", personID)
-	urlStr := fmt.Sprintf("%s/person/%s?api_key=%s&language=pt-BR", TmdbBase, personID, getTmdbApiKey())
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbDetailsSeconds, nil)
+	urlStr := fmt.Sprintf("%s/person/%s?api_key=%s&language=pt-BR", server.TmdbBase, personID, server.GetTmdbApiKey())
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbDetailsSeconds, nil)
 }
 
-// TMDB: Person Credits (Filmografia)
-func handleTmdbPersonCredits(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleTmdbPersonCredits retorna a filmografia de um ator.
+func HandleTmdbPersonCredits(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
 	personID := q.Get("id")
 	if personID == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro id é obrigatório", "")
 		return
 	}
 
 	cacheKey := fmt.Sprintf("person_credits:%s:pt-BR", personID)
-	urlStr := fmt.Sprintf("%s/person/%s/combined_credits?api_key=%s&language=pt-BR", TmdbBase, personID, getTmdbApiKey())
-	fetchWithCache(w, cacheKey, urlStr, TtlTmdbDetailsSeconds, nil)
+	urlStr := fmt.Sprintf("%s/person/%s/combined_credits?api_key=%s&language=pt-BR", server.TmdbBase, personID, server.GetTmdbApiKey())
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbDetailsSeconds, nil)
 }
 
-// API: Batch de Metadados de Mídia (ThreadPool equivalente)
-func handleMediaMetaBatch(w http.ResponseWriter, r *http.Request) {
-	if !ensureTmdbKey(w) {
+// HandleMediaMetaBatch busca metadados de várias mídias em paralelo.
+func HandleMediaMetaBatch(w http.ResponseWriter, r *http.Request) {
+	if !server.EnsureTmdbKey(w) {
 		return
 	}
 	q := r.URL.Query()
@@ -373,7 +391,7 @@ func handleMediaMetaBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(ids) == 0 {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro ids é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro ids é obrigatório", "")
 		return
 	}
 
@@ -410,21 +428,21 @@ func handleMediaMetaBatch(w http.ResponseWriter, r *http.Request) {
 			var cacheStatus string
 
 			// Tenta no persistente primeiro
-			stored, err := DbCache.MediaMetadataGet(storageKey)
+			stored, err := server.DbCache.MediaMetadataGet(storageKey)
 			if err == nil && len(stored) > 0 {
 				body = stored
 				cacheStatus = "STORE"
 			} else {
 				// Tenta no cache comum
 				cacheKey := fmt.Sprintf("tmdb:%s:%s:pt-BR", tmdbMedia, id)
-				status, _, cacheBody, expiresAt, err := DbCache.ApiCacheGet(cacheKey)
+				status, _, cacheBody, expiresAt, err := server.DbCache.ApiCacheGet(cacheKey)
 				if err == nil && expiresAt > time.Now().Unix() && status == http.StatusOK {
 					body = cacheBody
 					cacheStatus = "HIT"
-					_ = DbCache.MediaMetadataSet(storageKey, tmdbMedia, id, body, time.Now().Unix())
+					_ = server.DbCache.MediaMetadataSet(storageKey, tmdbMedia, id, body, time.Now().Unix())
 				} else {
 					// Busca remota
-					urlStr := fmt.Sprintf("%s/%s/%s?api_key=%s&language=pt-BR", TmdbBase, tmdbMedia, id, getTmdbApiKey())
+					urlStr := fmt.Sprintf("%s/%s/%s?api_key=%s&language=pt-BR", server.TmdbBase, tmdbMedia, id, server.GetTmdbApiKey())
 					client := http.Client{Timeout: 10 * time.Second}
 					req, _ := http.NewRequest("GET", urlStr, nil)
 					req.Header.Set("User-Agent", "MeuPlayer/1.0")
@@ -436,8 +454,8 @@ func handleMediaMetaBatch(w http.ResponseWriter, r *http.Request) {
 							body = respBody
 							cacheStatus = "MISS"
 							now := time.Now().Unix()
-							_ = DbCache.ApiCacheSet(cacheKey, http.StatusOK, "application/json; charset=utf-8", body, now+TtlTmdbDetailsSeconds, now)
-							_ = DbCache.MediaMetadataSet(storageKey, tmdbMedia, id, body, now)
+							_ = server.DbCache.ApiCacheSet(cacheKey, http.StatusOK, "application/json; charset=utf-8", body, now+server.TtlTmdbDetailsSeconds, now)
+							_ = server.DbCache.MediaMetadataSet(storageKey, tmdbMedia, id, body, now)
 						}
 					}
 				}
@@ -471,7 +489,7 @@ func handleMediaMetaBatch(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"items": items})
 }
 
-// Filtro de Segurança Adulto
+// tmdbMetaIsAdult aplica o filtro de segurança adulto.
 func tmdbMetaIsAdult(meta map[string]interface{}) bool {
 	if meta == nil {
 		return false
@@ -495,7 +513,7 @@ func tmdbMetaIsAdult(meta map[string]interface{}) bool {
 	return matched
 }
 
-// Normaliza texto removendo acentos e deixando em caixa baixa
+// normalizeText remove acentos e deixa o texto em caixa baixa.
 func normalizeText(s string) string {
 	s = strings.ToLower(s)
 	// Mapa básico de transliteração para português (rápido e simples)
@@ -510,8 +528,8 @@ func normalizeText(s string) string {
 	return replacer.Replace(s)
 }
 
-// API: Listar Mídias Salvas no Cache do Banco
-func handleMediaStored(w http.ResponseWriter, r *http.Request) {
+// HandleMediaStored lista as mídias já salvas no banco de cache.
+func HandleMediaStored(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit := 200
 	if limitStr := q.Get("limit"); limitStr != "" {
@@ -523,9 +541,9 @@ func handleMediaStored(w http.ResponseWriter, r *http.Request) {
 		limit = 500
 	}
 
-	rows, err := DbCache.MediaMetadataList(limit)
+	rows, err := server.DbCache.MediaMetadataList(limit)
 	if err != nil {
-		sendJSONError(w, http.StatusInternalServerError, "Falha ao consultar banco", err.Error())
+		server.SendJSONError(w, http.StatusInternalServerError, "Falha ao consultar banco", err.Error())
 		return
 	}
 
@@ -568,17 +586,17 @@ func isAnimationTV(meta map[string]interface{}) bool {
 	if genres, ok := meta["genres"].([]interface{}); ok {
 		for _, g := range genres {
 			if gm, ok := g.(map[string]interface{}); ok {
-				if id, ok := gm["id"].(float64); ok && int(id) == AnimationGenreID {
+				if id, ok := gm["id"].(float64); ok && int(id) == server.AnimationGenreID {
 					return true
 				}
-			} else if id, ok := g.(float64); ok && int(id) == AnimationGenreID {
+			} else if id, ok := g.(float64); ok && int(id) == server.AnimationGenreID {
 				return true
 			}
 		}
 	}
 	if genreIDs, ok := meta["genre_ids"].([]interface{}); ok {
 		for _, g := range genreIDs {
-			if id, ok := g.(float64); ok && int(id) == AnimationGenreID {
+			if id, ok := g.(float64); ok && int(id) == server.AnimationGenreID {
 				return true
 			}
 		}
@@ -586,53 +604,53 @@ func isAnimationTV(meta map[string]interface{}) bool {
 	return false
 }
 
-// Proxy de Imagens do TMDB (Cria pastas e salva localmente)
-func handleTmdbImage(w http.ResponseWriter, r *http.Request) {
+// HandleTmdbImage faz proxy e cache local das imagens do TMDB.
+func HandleTmdbImage(w http.ResponseWriter, r *http.Request) {
 	prefix := "/api/image/tmdb/"
 	raw := r.URL.Path[len(prefix):]
 	parts := strings.SplitN(raw, "/", 2)
 	if len(parts) < 2 {
-		sendJSONError(w, http.StatusBadRequest, "Formato inválido de imagem", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Formato inválido de imagem", "")
 		return
 	}
 	size := parts[0]
 	imageRelPath := parts[1]
 
 	if !allowedImageSizes[size] {
-		sendJSONError(w, http.StatusBadRequest, "Tamanho de imagem inválido", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Tamanho de imagem inválido", "")
 		return
 	}
 
 	// Sanitização contra path traversal
 	if strings.Contains(imageRelPath, "..") || strings.HasPrefix(imageRelPath, ".") || strings.Contains(imageRelPath, "\\") {
-		sendJSONError(w, http.StatusBadRequest, "Caminho de imagem inválido", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Caminho de imagem inválido", "")
 		return
 	}
 
 	ext := strings.ToLower(filepath.Ext(imageRelPath))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".gif" {
-		sendJSONError(w, http.StatusBadRequest, "Formato de arquivo não suportado", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Formato de arquivo não suportado", "")
 		return
 	}
 
-	localPath := filepath.Join(ImageCacheDir, size, imageRelPath)
+	localPath := filepath.Join(server.ImageCacheDir, size, imageRelPath)
 
 	serveLocalImage := func(status string) {
-		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", TtlImageSeconds))
+		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", server.TtlImageSeconds))
 		w.Header().Set("X-Cache", status)
 		http.ServeFile(w, r, localPath)
 	}
 
 	// 1. Tenta servir localmente
 	if fi, err := os.Stat(localPath); err == nil {
-		if time.Now().Unix()-fi.ModTime().Unix() <= TtlImageSeconds {
+		if time.Now().Unix()-fi.ModTime().Unix() <= server.TtlImageSeconds {
 			serveLocalImage("HIT")
 			return
 		}
 	}
 
 	// 2. Tenta download remoto
-	remoteUrl := fmt.Sprintf("%s/%s/%s", TmdbImageBase, size, imageRelPath)
+	remoteUrl := fmt.Sprintf("%s/%s/%s", server.TmdbImageBase, size, imageRelPath)
 	client := http.Client{Timeout: 20 * time.Second}
 	req, _ := http.NewRequest("GET", remoteUrl, nil)
 	req.Header.Set("User-Agent", "MeuPlayer/1.0")
@@ -665,5 +683,3 @@ func handleTmdbImage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(placeholderGif)
 }
-
-// Parseador nativo do Guia de Programação (HTML -> JSON)
