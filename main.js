@@ -60,7 +60,7 @@ function getServerLaunch() {
 
   return {
     command: 'go',
-    args: ['run', '.'],
+    args: ['run', './cmd/server'],
     cwd: __dirname,
     staticDir: path.join(__dirname, 'public'),
   };

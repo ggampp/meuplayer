@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"meuplayer/internal/server"
 )
 
 func filterRedeBuzzPayload(data []byte) []byte {
@@ -68,11 +70,11 @@ func isRdeAdultCategory(val interface{}) bool {
 		return false
 	}
 	s := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", val)))
-	return s == RdeAdultCategory
+	return s == server.RdeAdultCategory
 }
 
-// API: Canais da Rede Buzz
-func handleRedeBuzzChannels(w http.ResponseWriter, r *http.Request) {
+// HandleRedeBuzzChannels lista os canais da Rede Buzz.
+func HandleRedeBuzzChannels(w http.ResponseWriter, r *http.Request) {
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	if isRdeAdultCategory(category) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -82,32 +84,30 @@ func handleRedeBuzzChannels(w http.ResponseWriter, r *http.Request) {
 
 	var urlStr, cacheKey string
 	if category != "" {
-		urlStr = fmt.Sprintf("%s/channels?category=%s", RdeApiBase, url.QueryEscape(category))
+		urlStr = fmt.Sprintf("%s/channels?category=%s", server.RdeApiBase, url.QueryEscape(category))
 		cacheKey = fmt.Sprintf("rde:channels:cat:%s", strings.ToLower(category))
 	} else {
-		urlStr = fmt.Sprintf("%s/channels", RdeApiBase)
+		urlStr = fmt.Sprintf("%s/channels", server.RdeApiBase)
 		cacheKey = "rde:channels:all"
 	}
 
-	fetchWithCache(w, cacheKey, urlStr, TtlRdeSeconds, filterRedeBuzzPayload)
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlRdeSeconds, filterRedeBuzzPayload)
 }
 
-// API: Categorias da Rede Buzz
-func handleRedeBuzzCategories(w http.ResponseWriter, r *http.Request) {
-	urlStr := fmt.Sprintf("%s/channels/categories", RdeApiBase)
-	fetchWithCache(w, "rde:categories", urlStr, TtlRdeSeconds, filterRedeBuzzPayload)
+// HandleRedeBuzzCategories lista as categorias da Rede Buzz.
+func HandleRedeBuzzCategories(w http.ResponseWriter, r *http.Request) {
+	urlStr := fmt.Sprintf("%s/channels/categories", server.RdeApiBase)
+	server.FetchWithCache(w, "rde:categories", urlStr, server.TtlRdeSeconds, filterRedeBuzzPayload)
 }
 
-// API: Pesquisa da Rede Buzz
-func handleRedeBuzzSearch(w http.ResponseWriter, r *http.Request) {
+// HandleRedeBuzzSearch pesquisa na Rede Buzz.
+func HandleRedeBuzzSearch(w http.ResponseWriter, r *http.Request) {
 	term := strings.TrimSpace(r.URL.Query().Get("q"))
 	if term == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro q é obrigatório", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro q é obrigatório", "")
 		return
 	}
-	urlStr := fmt.Sprintf("%s/pesquisa?q=%s", RdeApiBase, url.QueryEscape(term))
+	urlStr := fmt.Sprintf("%s/pesquisa?q=%s", server.RdeApiBase, url.QueryEscape(term))
 	cacheKey := fmt.Sprintf("rde:search:%s", strings.ToLower(term))
-	fetchWithCache(w, cacheKey, urlStr, TtlRdeSeconds, filterRedeBuzzPayload)
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlRdeSeconds, filterRedeBuzzPayload)
 }
-
-// REMOTE CONTROL: Criar Sessão

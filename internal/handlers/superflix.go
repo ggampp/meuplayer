@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -8,29 +8,32 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"meuplayer/internal/server"
 )
 
-func handleLista(w http.ResponseWriter, r *http.Request) {
+// HandleLista repassa a lista do SuperFlix usando o cache de API.
+func HandleLista(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if q.Get("format") == "" {
 		q.Set("format", "json")
 	}
 	rawQuery := q.Encode()
 	cacheKey := fmt.Sprintf("lista:%s", rawQuery)
-	urlStr := fmt.Sprintf("%s/lista?%s", ApiBase, rawQuery)
-	fetchWithCache(w, cacheKey, urlStr, TtlListaSeconds, nil)
+	urlStr := fmt.Sprintf("%s/lista?%s", server.ApiBase, rawQuery)
+	server.FetchWithCache(w, cacheKey, urlStr, server.TtlListaSeconds, nil)
 }
 
-// API: Calendário
-func handleCalendario(w http.ResponseWriter, r *http.Request) {
-	urlStr := fmt.Sprintf("%s/calendario.php", ApiBase)
+// HandleCalendario repassa o calendário do SuperFlix.
+func HandleCalendario(w http.ResponseWriter, r *http.Request) {
+	urlStr := fmt.Sprintf("%s/calendario.php", server.ApiBase)
 	client := http.Client{Timeout: 15 * time.Second}
 	req, _ := http.NewRequest("GET", urlStr, nil)
 	req.Header.Set("User-Agent", "MeuPlayer/1.0")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao acessar API externa", err.Error())
+		server.SendJSONError(w, http.StatusBadGateway, "Falha ao acessar API externa", err.Error())
 		return
 	}
 	defer resp.Body.Close()
@@ -39,16 +42,16 @@ func handleCalendario(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, resp.Body)
 }
 
-// API: Detalhes do TMDB (com cache duplo no banco e pré-download de imagens)
-func handleGuia(w http.ResponseWriter, r *http.Request) {
+// HandleGuia retorna a programação de TV de um canal (HTML -> JSON, com cache).
+func HandleGuia(w http.ResponseWriter, r *http.Request) {
 	canal := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("canal")))
 	if canal == "" {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro canal inválido ou ausente", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro canal inválido ou ausente", "")
 		return
 	}
 	matched, _ := regexp.MatchString("^[A-Z0-9]{1,10}$", canal)
 	if !matched {
-		sendJSONError(w, http.StatusBadRequest, "Parâmetro canal inválido", "")
+		server.SendJSONError(w, http.StatusBadRequest, "Parâmetro canal inválido", "")
 		return
 	}
 
@@ -56,7 +59,7 @@ func handleGuia(w http.ResponseWriter, r *http.Request) {
 	cacheKey := fmt.Sprintf("guia:%s:%s", canal, today)
 
 	// Tenta do cache
-	status, contentType, body, expiresAt, err := DbCache.ApiCacheGet(cacheKey)
+	status, contentType, body, expiresAt, err := server.DbCache.ApiCacheGet(cacheKey)
 	if err == nil && expiresAt > time.Now().Unix() {
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("X-Cache", "HIT")
@@ -73,14 +76,14 @@ func handleGuia(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao acessar o guia", err.Error())
+		server.SendJSONError(w, http.StatusBadGateway, "Falha ao acessar o guia", err.Error())
 		return
 	}
 	defer resp.Body.Close()
 
 	htmlBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao ler o guia", err.Error())
+		server.SendJSONError(w, http.StatusBadGateway, "Falha ao ler o guia", err.Error())
 		return
 	}
 
@@ -88,7 +91,7 @@ func handleGuia(w http.ResponseWriter, r *http.Request) {
 	respBody, _ := json.Marshal(schedule)
 
 	now := time.Now().Unix()
-	_ = DbCache.ApiCacheSet(cacheKey, http.StatusOK, "application/json; charset=utf-8", respBody, now+TtlGuiaSeconds, now)
+	_ = server.DbCache.ApiCacheSet(cacheKey, http.StatusOK, "application/json; charset=utf-8", respBody, now+server.TtlGuiaSeconds, now)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Cache", "MISS")
@@ -96,7 +99,7 @@ func handleGuia(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(respBody)
 }
 
-// Filtros da Rede Buzz (Rei dos Embeds)
+// parseGuiaHTML extrai a grade de programação do HTML do meuguia.tv.
 func parseGuiaHTML(htmlBytes []byte) []map[string]string {
 	html := string(htmlBytes)
 	// Encontra horários em formato de guia
@@ -151,5 +154,3 @@ func parseGuiaHTML(htmlBytes []byte) []map[string]string {
 	}
 	return schedule
 }
-
-// API: Guia de Programação de TV

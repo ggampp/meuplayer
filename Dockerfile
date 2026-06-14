@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 
 # Compila o binário de forma otimizada para Linux
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o meuplayer-server .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o meuplayer-server ./cmd/server
 
 FROM alpine:3.19
 

@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -6,16 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"meuplayer/internal/server"
 )
 
-func handleSettings(w http.ResponseWriter, r *http.Request) {
-	settingsPath := filepath.Join(UserDataDir, "settings.json")
+// HandleSettings lê e grava a chave TMDB em settings.json.
+func HandleSettings(w http.ResponseWriter, r *http.Request) {
+	settingsPath := filepath.Join(server.UserDataDir, "settings.json")
 
 	if r.Method == "GET" {
-		key := getTmdbApiKey()
+		key := server.GetTmdbApiKey()
 		resp := map[string]interface{}{
 			"hasTmdbKey":     key != "",
-			"tmdbKeyPreview": maskTmdbKey(key),
+			"tmdbKeyPreview": server.MaskTmdbKey(key),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -25,14 +28,14 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var body map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			sendJSONError(w, http.StatusBadRequest, "JSON inválido", err.Error())
+			server.SendJSONError(w, http.StatusBadRequest, "JSON inválido", err.Error())
 			return
 		}
 
 		key, exists := body["tmdbApiKey"]
 		if exists {
 			key = strings.TrimSpace(key)
-			setTmdbApiKey(key)
+			server.SetTmdbApiKey(key)
 
 			// Salva em settings.json
 			settings := make(map[string]interface{})
@@ -49,11 +52,11 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			_ = os.WriteFile(settingsPath, append(data, '\n'), 0644)
 		}
 
-		respKey := getTmdbApiKey()
+		respKey := server.GetTmdbApiKey()
 		resp := map[string]interface{}{
 			"ok":             true,
 			"hasTmdbKey":     respKey != "",
-			"tmdbKeyPreview": maskTmdbKey(respKey),
+			"tmdbKeyPreview": server.MaskTmdbKey(respKey),
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -62,5 +65,3 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusMethodNotAllowed)
 }
-
-// Cache da API Proxy Helper

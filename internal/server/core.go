@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -9,10 +9,46 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
+
+	"meuplayer/internal/cache"
 )
 
-func corsMiddleware(next http.Handler) http.Handler {
+// Configurações e Constantes
+var (
+	BaseDir       string
+	UserDataDir   string
+	StaticDir     string
+	ImageCacheDir string
+	DbCache       *cache.CacheDB
+
+	tmdbApiKey  string
+	tmdbKeyLock sync.RWMutex
+)
+
+const (
+	Port                  = "3000"
+	ApiBase               = "https://superflixapi.one"
+	RdeApiBase            = "https://reidosembeds.com/api"
+	RdeAdultCategory      = "adulto"
+	TmdbBase              = "https://api.themoviedb.org/3"
+	TmdbImageBase         = "https://image.tmdb.org/t/p"
+	AnimationGenreID      = 16
+	TtlGuiaSeconds        = 30 * 60
+	TtlTmdbDetailsSeconds = 7 * 24 * 60 * 60
+	TtlTmdbGenresSeconds  = 30 * 24 * 60 * 60
+	TtlTmdbSearchSeconds  = 24 * 60 * 60
+	TtlTmdbSeasonSeconds  = 3 * 24 * 60 * 60
+	TtlTmdbRelatedSeconds = 3 * 24 * 60 * 60
+	TtlImageSeconds       = 30 * 24 * 60 * 60
+	TtlListaSeconds       = 6 * 60 * 60
+	TtlRdeSeconds         = 30 * 60
+	RemoteSessionTtl      = 4 * 60 * 60
+)
+
+// CorsMiddleware aplica os cabeçalhos CORS a todas as respostas.
+func CorsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -25,8 +61,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Configuração de Caminhos
-func setupPaths() {
+// SetupPaths configura os caminhos base, de dados e estáticos.
+func SetupPaths() {
 	var err error
 	BaseDir, err = filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
@@ -48,8 +84,8 @@ func setupPaths() {
 	_ = os.MkdirAll(ImageCacheDir, 0755)
 }
 
-// Carregar arquivo .env se existir
-func loadEnvFile() {
+// LoadEnvFile carrega o arquivo .env se existir.
+func LoadEnvFile() {
 	envPath := filepath.Join(BaseDir, ".env")
 	if _, err := os.Stat(envPath); err != nil {
 		return
@@ -73,8 +109,8 @@ func loadEnvFile() {
 	}
 }
 
-// Carrega a chave do TMDB
-func bootstrapTmdbKey() {
+// BootstrapTmdbKey carrega a chave do TMDB de settings.json ou do ambiente.
+func BootstrapTmdbKey() {
 	// Primeiro, lê do settings.json
 	settingsPath := filepath.Join(UserDataDir, "settings.json")
 	if _, err := os.Stat(settingsPath); err == nil {
@@ -82,7 +118,7 @@ func bootstrapTmdbKey() {
 			var settings map[string]interface{}
 			if err := json.Unmarshal(content, &settings); err == nil {
 				if key, ok := settings["tmdbApiKey"].(string); ok && strings.TrimSpace(key) != "" {
-					setTmdbApiKey(key)
+					SetTmdbApiKey(key)
 					return
 				}
 			}
@@ -92,23 +128,26 @@ func bootstrapTmdbKey() {
 	// Segundo, lê das variáveis de ambiente
 	key := os.Getenv("TMDB_API_KEY")
 	if strings.TrimSpace(key) != "" {
-		setTmdbApiKey(key)
+		SetTmdbApiKey(key)
 	}
 }
 
-func getTmdbApiKey() string {
-	TmdbKeyLock.RLock()
-	defer TmdbKeyLock.RUnlock()
-	return TmdbApiKey
+// GetTmdbApiKey retorna a chave TMDB atual.
+func GetTmdbApiKey() string {
+	tmdbKeyLock.RLock()
+	defer tmdbKeyLock.RUnlock()
+	return tmdbApiKey
 }
 
-func setTmdbApiKey(key string) {
-	TmdbKeyLock.Lock()
-	defer TmdbKeyLock.Unlock()
-	TmdbApiKey = strings.TrimSpace(key)
+// SetTmdbApiKey define a chave TMDB atual.
+func SetTmdbApiKey(key string) {
+	tmdbKeyLock.Lock()
+	defer tmdbKeyLock.Unlock()
+	tmdbApiKey = strings.TrimSpace(key)
 }
 
-func maskTmdbKey(key string) string {
+// MaskTmdbKey ofusca a chave TMDB para exibição.
+func MaskTmdbKey(key string) string {
 	if len(key) <= 8 {
 		if key != "" {
 			return "••••"
@@ -118,8 +157,8 @@ func maskTmdbKey(key string) string {
 	return key[:4] + "…" + key[len(key)-4:]
 }
 
-// Configura o Banco de Dados de Cache
-func setupDatabase() {
+// SetupDatabase inicializa o banco de cache (SQLite ou PostgreSQL).
+func SetupDatabase() {
 	dbUrl := os.Getenv("CACHE_DATABASE_URL")
 	var driver, dsn string
 
@@ -132,25 +171,23 @@ func setupDatabase() {
 	}
 
 	var err error
-	DbCache, err = NewCacheDB(driver, dsn)
+	DbCache, err = cache.NewCacheDB(driver, dsn)
 	if err != nil {
 		log.Fatalf("[meuplayer] Erro ao inicializar banco de cache: %v", err)
 	}
-	fmt.Printf("[meuplayer] cache: %s\n", DbCache.driver)
+	fmt.Printf("[meuplayer] cache: %s\n", DbCache.Driver())
 }
 
-// Limpeza Periódica de Cache Expirado
-func runPeriodicCleanup() {
+// RunPeriodicCleanup remove periodicamente o cache de API expirado.
+func RunPeriodicCleanup() {
 	ticker := time.NewTicker(12 * time.Hour)
 	for range ticker.C {
-		now := time.Now().Unix()
-		// Deleta cache de API expirado
-		_, _ = DbCache.db.Exec(DbCache.query("DELETE FROM api_cache WHERE expires_at <= ?"), now)
+		_ = DbCache.CleanupExpired(time.Now().Unix())
 	}
 }
 
-// Helper para enviar erros JSON
-func sendJSONError(w http.ResponseWriter, status int, errStr, detail string) {
+// SendJSONError envia um erro em JSON.
+func SendJSONError(w http.ResponseWriter, status int, errStr, detail string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	resp := map[string]string{"error": errStr}
@@ -160,17 +197,17 @@ func sendJSONError(w http.ResponseWriter, status int, errStr, detail string) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// Helper para verificar chave TMDB
-func ensureTmdbKey(w http.ResponseWriter) bool {
-	if getTmdbApiKey() != "" {
+// EnsureTmdbKey verifica se a chave TMDB está configurada.
+func EnsureTmdbKey(w http.ResponseWriter) bool {
+	if GetTmdbApiKey() != "" {
 		return true
 	}
-	sendJSONError(w, http.StatusBadRequest, "TMDB_API_KEY não configurada", "Abra Configurações no menu e informe sua chave do TMDB")
+	SendJSONError(w, http.StatusBadRequest, "TMDB_API_KEY não configurada", "Abra Configurações no menu e informe sua chave do TMDB")
 	return false
 }
 
-// Roteamento SPA e arquivos estáticos
-func fetchWithCache(w http.ResponseWriter, cacheKey string, urlStr string, ttlSeconds int64, cleanBodyFunc func([]byte) []byte) {
+// FetchWithCache busca uma URL externa usando o cache de API do banco.
+func FetchWithCache(w http.ResponseWriter, cacheKey string, urlStr string, ttlSeconds int64, cleanBodyFunc func([]byte) []byte) {
 	// 1. Tenta recuperar do cache
 	status, contentType, body, expiresAt, err := DbCache.ApiCacheGet(cacheKey)
 	if err == nil && expiresAt > time.Now().Unix() {
@@ -188,14 +225,14 @@ func fetchWithCache(w http.ResponseWriter, cacheKey string, urlStr string, ttlSe
 
 	resp, err := client.Do(req)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao acessar API externa", err.Error())
+		SendJSONError(w, http.StatusBadGateway, "Falha ao acessar API externa", err.Error())
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		sendJSONError(w, http.StatusBadGateway, "Falha ao ler resposta da API externa", err.Error())
+		SendJSONError(w, http.StatusBadGateway, "Falha ao ler resposta da API externa", err.Error())
 		return
 	}
 
@@ -218,5 +255,3 @@ func fetchWithCache(w http.ResponseWriter, cacheKey string, urlStr string, ttlSe
 	w.WriteHeader(resp.StatusCode)
 	_, _ = w.Write(respBody)
 }
-
-// API: Lista

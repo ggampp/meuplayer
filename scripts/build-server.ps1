@@ -13,7 +13,7 @@ if (-not (Test-Path "dist-server")) {
     New-Item -ItemType Directory -Path "dist-server" | Out-Null
 }
 
-go build -ldflags="-s -w" -o dist-server/meuplayer-server.exe .
+go build -ldflags="-s -w" -o dist-server/meuplayer-server.exe ./cmd/server
 
 if (-not (Test-Path "dist-server\meuplayer-server.exe")) {
     Write-Error "Build falhou: dist-server\meuplayer-server.exe não foi criado."
@@ -25,7 +25,7 @@ Write-Host "OK: dist-server\meuplayer-server.exe"
 Write-Host "Compilando meuplayer-server (Linux)..."
 $env:GOOS = "linux"
 $env:GOARCH = "amd64"
-go build -ldflags="-s -w" -o dist-server/meuplayer-server-linux .
+go build -ldflags="-s -w" -o dist-server/meuplayer-server-linux ./cmd/server
 
 if (-not (Test-Path "dist-server\meuplayer-server-linux")) {
     Write-Error "Build do Linux falhou."

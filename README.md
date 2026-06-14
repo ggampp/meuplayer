@@ -32,7 +32,7 @@ npm install
 npm start
 ```
 
-`npm start` compila o frontend (`build:frontend`) e abre o Electron. Em dev o servidor sobe com `go run .` na porta **8765**.
+`npm start` compila o frontend (`build:frontend`) e abre o Electron. Em dev o servidor sobe com `go run ./cmd/server`.
 
 Requisitos: **Node.js**, **Go 1.22+** (para desenvolvimento e build do servidor).
 
@@ -64,9 +64,10 @@ npm run build:mac
 | Arquivo / pasta | Função |
 |-----------------|--------|
 | `main.js` | Electron, janela, spawn do servidor Go |
-| `cmd/server/` | (alvo Fase 6) Bootstrap HTTP |
-| `internal/` | (alvo Fase 6) Cache, server core, handlers |
-| `main.go`, `handlers_*.go`, `db.go` | Servidor Go (hoje na raiz; migrar na Sprint 7) |
+| `cmd/server/main.go` | Bootstrap HTTP + registro de rotas |
+| `internal/cache/db.go` | Cache SQLite / PostgreSQL |
+| `internal/server/core.go` | Paths, CORS, chave TMDB, `FetchWithCache` |
+| `internal/handlers/*.go` | Handlers HTTP (tmdb, superflix, rede_buzz, remote, settings, static, misc) |
 | `public/app.jsx` | UI React principal |
 | `public/app.js` | Build de produção (gerado) |
 | `public/css/` | Partials de estilo |
@@ -77,7 +78,26 @@ npm run build:mac
 | `design.md` | Design system (locked) |
 | `docs/` | Sprints, guia de agentes, plano de alinhamento |
 
-Mapa completo da raiz: [docs/sprints/007-root-layout.md](./docs/sprints/007-root-layout.md).
+Árvore do repositório:
+
+```
+meuplayer/
+├── README.md, design.md, SPRINTS.md     # docs de entrada
+├── package.json, go.mod, main.js        # manifests desktop
+├── Dockerfile, docker-compose*.yml      # deploy
+├── cmd/server/main.go                   # bootstrap HTTP + rotas
+├── internal/
+│   ├── cache/db.go                      # SQLite / PostgreSQL
+│   ├── server/core.go                   # paths, CORS, TMDB, FetchWithCache
+│   └── handlers/*.go                    # handlers HTTP
+├── public/                              # UI + downloads (versionados)
+├── docs/                                # planejamento e guias
+├── scripts/                             # build, ícones, python/
+├── img/                                 # assets fonte
+└── android/                             # TV Box
+```
+
+Mapa completo (com regras): [docs/sprints/007-root-layout.md](./docs/sprints/007-root-layout.md).
 
 ## Usar em outro computador
 

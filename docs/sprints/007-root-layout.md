@@ -2,7 +2,7 @@
 
 **Objetivo:** Deixar a raiz do repositório previsível — só entradas de build/deploy, documentação principal e ponteiros; código e assets agrupados por função.
 
-**Status:** Planejada (ver [ALIGNMENT_PLAN.md](../ALIGNMENT_PLAN.md) Fase 6)
+**Status:** Concluída (ver [ALIGNMENT_PLAN.md](../ALIGNMENT_PLAN.md) Fase 6)
 
 ---
 
@@ -79,27 +79,27 @@ meuplayer/
 
 ### 7.1 Limpeza de legado na raiz
 
-- [ ] Remover ou arquivar `index.html`, `app.js`, `styles.css` da raiz (substituídos por `public/`)
-- [ ] Adicionar `meuplayer.exe` e `*.exe` na raiz ao `.gitignore` (exceto `public/downloads/`)
-- [ ] Mover `requirements.txt` → `scripts/python/requirements.txt` ou marcar como deprecated no README
-- [ ] Garantir `cache.sqlite3` fora do Git (já coberto por `.gitignore`)
+- [x] Remover ou arquivar `index.html`, `app.js`, `styles.css` da raiz (substituídos por `public/`)
+- [x] Adicionar `meuplayer.exe` e `*.exe` na raiz ao `.gitignore` (exceto `public/downloads/`)
+- [x] Mover `requirements.txt` → `scripts/python/requirements.txt`
+- [x] Garantir `cache.sqlite3` fora do Git (`.gitignore` + `git rm --cached`)
 
 ### 7.2 Reorganizar Go (`internal/` + `cmd/`)
 
-- [ ] Criar `cmd/server/main.go` com `main()` e registro de rotas
-- [ ] Mover `db.go` → `internal/cache/db.go`
-- [ ] Mover `server_core.go` → `internal/server/core.go`
-- [ ] Mover `handlers_*.go` → `internal/handlers/` (renomear sem prefixo `handlers_`)
-- [ ] Atualizar `scripts/build-server.ps1`: `go build -o dist-server/... ./cmd/server`
-- [ ] Atualizar `Dockerfile`: `go build` apontando para `./cmd/server`
-- [ ] Atualizar `main.js` dev: `go run ./cmd/server` (ou manter `go run .` com replace no go.mod)
-- [ ] `go build ./...` e teste Electron
+- [x] Criar `cmd/server/main.go` com `main()` e registro de rotas
+- [x] Mover `db.go` → `internal/cache/db.go` (pacote `cache`)
+- [x] Mover `server_core.go` → `internal/server/core.go` (pacote `server`)
+- [x] Mover `handlers_*.go` → `internal/handlers/` (renomear sem prefixo `handlers_`)
+- [x] Atualizar `scripts/build-server.ps1`: `go build -o dist-server/... ./cmd/server`
+- [x] Atualizar `Dockerfile`: `go build` apontando para `./cmd/server`
+- [x] Atualizar `main.js` dev: `go run ./cmd/server`
+- [x] `go build ./...`, `go vet ./...` e smoke test do servidor
 
 ### 7.3 Documentação da raiz
 
-- [ ] Atualizar `README.md` — seção “Estrutura do repositório”
-- [ ] Atualizar `docs/AGENT_DEVELOPMENT_GUIDE.md` — mapa de pastas
-- [ ] Atualizar `docs/ALIGNMENT_PLAN.md` — marcar Fase 6 concluída
+- [x] Atualizar `README.md` — seção “Estrutura do repositório” + árvore
+- [x] Atualizar `docs/AGENT_DEVELOPMENT_GUIDE.md` — mapa de pastas
+- [x] Atualizar `docs/ALIGNMENT_PLAN.md` — marcar Fase 6 concluída
 
 ### 7.4 O que **permanece** na raiz (regra)
 

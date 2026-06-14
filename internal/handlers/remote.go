@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"crypto/rand"
@@ -7,10 +7,26 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
+
+	"meuplayer/internal/server"
 )
 
-func handleRemoteSessionCreate(w http.ResponseWriter, r *http.Request) {
+// RemoteSession representa uma sessão de controle remoto via SSE.
+type RemoteSession struct {
+	CreatedAt int64
+	Clients   map[chan string]bool
+	Lock      sync.Mutex
+}
+
+var (
+	sessions     = make(map[string]*RemoteSession)
+	sessionsLock sync.Mutex
+)
+
+// HandleRemoteSessionCreate cria uma nova sessão de controle remoto.
+func HandleRemoteSessionCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -28,15 +44,15 @@ func handleRemoteSessionCreate(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
 }
 
-// REMOTE CONTROL: Stream SSE (Server-Sent Events)
-func handleRemoteEvents(w http.ResponseWriter, r *http.Request) {
+// HandleRemoteEvents transmite eventos via SSE para a sessão informada.
+func HandleRemoteEvents(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.URL.Query().Get("session"))
 	sessionsLock.Lock()
 	session, exists := sessions[token]
 	sessionsLock.Unlock()
 
-	if !exists || time.Now().Unix()-session.CreatedAt >= RemoteSessionTtl {
-		sendJSONError(w, http.StatusNotFound, "Sessão não encontrada ou expirada", "")
+	if !exists || time.Now().Unix()-session.CreatedAt >= server.RemoteSessionTtl {
+		server.SendJSONError(w, http.StatusNotFound, "Sessão não encontrada ou expirada", "")
 		return
 	}
 
@@ -96,8 +112,8 @@ func handleRemoteEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// REMOTE CONTROL: Receber Comandos
-func handleRemoteCommand(w http.ResponseWriter, r *http.Request) {
+// HandleRemoteCommand recebe comandos e os repassa aos clientes SSE da sessão.
+func HandleRemoteCommand(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -105,7 +121,7 @@ func handleRemoteCommand(w http.ResponseWriter, r *http.Request) {
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sendJSONError(w, http.StatusBadRequest, "JSON inválido", err.Error())
+		server.SendJSONError(w, http.StatusBadRequest, "JSON inválido", err.Error())
 		return
 	}
 
@@ -114,7 +130,7 @@ func handleRemoteCommand(w http.ResponseWriter, r *http.Request) {
 	value := strings.TrimSpace(body["value"])
 
 	if token == "" || action == "" {
-		sendJSONError(w, http.StatusBadRequest, "session e action são obrigatórios", "")
+		server.SendJSONError(w, http.StatusBadRequest, "session e action são obrigatórios", "")
 		return
 	}
 
@@ -122,8 +138,8 @@ func handleRemoteCommand(w http.ResponseWriter, r *http.Request) {
 	session, exists := sessions[token]
 	sessionsLock.Unlock()
 
-	if !exists || time.Now().Unix()-session.CreatedAt >= RemoteSessionTtl {
-		sendJSONError(w, http.StatusNotFound, "Sessão não encontrada ou expirada", "")
+	if !exists || time.Now().Unix()-session.CreatedAt >= server.RemoteSessionTtl {
+		server.SendJSONError(w, http.StatusNotFound, "Sessão não encontrada ou expirada", "")
 		return
 	}
 
@@ -146,11 +162,8 @@ func handleRemoteCommand(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{"ok":true}`))
 }
 
-// Utils
 func generateSessionToken() string {
 	b := make([]byte, 20)
 	_, _ = rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }
-
-// API: Informações de ambiente para o cliente (usado para detecção)

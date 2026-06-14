@@ -55,7 +55,7 @@ Documento mestre para alinhar código, documentação e práticas do `AGENT_DEVE
 
 **Arquivos permitidos na Fase 4:** `public/app.jsx`, `public/js/**`, `public/*.html`, `package.json`.
 
-### Fase 6 — Organização da raiz (planejada)
+### Fase 6 — Organização da raiz (concluída)
 
 **Objetivo:** Raiz enxuta; código Go em `cmd/server` + `internal/`; remover protótipo legado.
 
@@ -82,11 +82,11 @@ meuplayer/
 
 **Tarefas principais:**
 
-- [ ] Remover `index.html`, `app.js`, `styles.css` da raiz (legado → só `public/`)
-- [ ] Mover handlers Go para `internal/handlers/`
-- [ ] `cmd/server/main.go` + ajustar `build-server.ps1` e `Dockerfile`
-- [ ] `.gitignore`: `meuplayer.exe`, `*.exe` na raiz (manter `public/downloads/`)
-- [ ] Atualizar README com árvore do repositório
+- [x] Remover `index.html`, `app.js`, `styles.css` da raiz (legado → só `public/`)
+- [x] Mover handlers Go para `internal/handlers/`
+- [x] `cmd/server/main.go` + ajustar `build-server.ps1` e `Dockerfile`
+- [x] `.gitignore`: `meuplayer.exe`, `*.exe` na raiz (manter `public/downloads/`)
+- [x] Atualizar README com árvore do repositório
 
 **O que não muda:** `public/downloads/` no Git; `design.md` na raiz.
 
