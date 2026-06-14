@@ -1,0 +1,229 @@
+/* —— Netflix layout (rota /netflix) ——————————————————————————————
+   Reaproveita os mesmos tokens/cores; muda só a usabilidade:
+   fileiras com scroll horizontal, setas, hover com leve zoom e
+   detalhes abertos como overlay sobre as fileiras. */
+
+.nf-rows {
+  display: grid;
+  gap: var(--space-2xl);
+  padding: calc(var(--space-md) / 2) var(--space-xl) var(--space-3xl);
+}
+
+.nf-row {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.nf-row__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding: 0 var(--space-2xs);
+}
+
+.nf-row__title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.nf-row__status {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--color-ink-3);
+}
+
+.nf-row__viewport {
+  position: relative;
+}
+
+.nf-row__track {
+  display: flex;
+  gap: var(--space-md);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: var(--space-xs) var(--space-2xs);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nf-row__track::-webkit-scrollbar {
+  display: none;
+}
+
+.nf-row__track > .card {
+  flex: 0 0 auto;
+  width: 172px;
+  scroll-snap-align: start;
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out);
+}
+
+.nf-row__track > .card:hover,
+.nf-row__track > .card:focus-visible {
+  transform: scale(1.07);
+  z-index: 4;
+  border-color: var(--color-rule-2);
+}
+
+.nf-live-card {
+  flex: 0 0 auto;
+  width: 172px;
+  aspect-ratio: auto;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  scroll-snap-align: start;
+}
+
+.nf-row__arrow {
+  position: absolute;
+  top: var(--space-xs);
+  bottom: var(--space-xs);
+  z-index: 6;
+  width: 3.25rem;
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  color: var(--color-ink);
+  font-size: 2.25rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+
+.nf-row__viewport:hover .nf-row__arrow,
+.nf-row__arrow:focus-visible {
+  opacity: 1;
+}
+
+.nf-row__arrow--left {
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    var(--color-paper) 10%,
+    oklch(16% 0.02 250 / 0) 100%
+  );
+}
+
+.nf-row__arrow--right {
+  right: 0;
+  background: linear-gradient(
+    270deg,
+    var(--color-paper) 10%,
+    oklch(16% 0.02 250 / 0) 100%
+  );
+}
+
+.nf-row__arrow:hover {
+  color: var(--color-accent);
+}
+
+.nf-row__more-card {
+  flex: 0 0 auto;
+  width: 172px;
+  aspect-ratio: 2 / 3;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border: 1px dashed var(--color-rule-2);
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    color var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out);
+}
+
+.nf-row__more-card:hover {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
+/* Detalhe / pessoa como overlay sobre a home Netflix */
+.nf-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  background: var(--color-overlay);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: nf-overlay-in var(--dur-med) var(--ease-out);
+}
+
+.nf-detail-overlay__scroll {
+  max-width: 1120px;
+  margin: var(--space-lg) auto;
+  padding: 0 var(--space-sm);
+}
+
+.nf-detail-overlay .detail {
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-figure);
+  box-shadow: 0 30px 90px oklch(0% 0 0 / 0.55);
+  overflow: hidden;
+}
+
+.nf-detail-overlay .detail--person {
+  padding-top: var(--space-lg);
+}
+
+@keyframes nf-overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .nf-rows {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+    gap: var(--space-xl);
+  }
+
+  .nf-row__track > .card,
+  .nf-row__more-card,
+  .nf-live-card {
+    width: 132px;
+  }
+
+  .nf-row__arrow {
+    display: none;
+  }
+
+  .nf-detail-overlay__scroll {
+    margin: 0 auto;
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-row__track > .card,
+  .nf-detail-overlay {
+    transition-duration: 0ms;
+    animation: none;
+  }
+}
+

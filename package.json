@@ -35,7 +35,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "seu-usuario",
+      "owner": "ggampp",
       "repo": "meuplayer"
     },
     "win": {

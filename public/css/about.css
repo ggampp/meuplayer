@@ -1,0 +1,22 @@
+/* —— About fallback section (unused on most pages) —————————————— */
+
+.about {
+  padding: var(--space-xl) var(--space-xl) var(--space-2xl);
+  display: grid;
+  gap: var(--space-sm);
+  max-width: 60ch;
+}
+
+.about h2 {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+}
+
+.about p {
+  color: var(--color-ink-2);
+  line-height: 1.6;
+}
+

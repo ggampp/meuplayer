@@ -30,7 +30,7 @@ dist/
 public/cache/
 cache.sqlite3-*
 
-
+# public/downloads/ — mantido no Git de propósito (distribuição sem clone do repo)
 # OS
 .DS_Store
 Thumbs.db

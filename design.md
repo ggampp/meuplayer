@@ -43,6 +43,14 @@ they vary only in component archetypes.
   - Full-screen container `modal--immersive` with pure black backdrop
   - Auto-hiding chrome controls: navigation bar is visible only when mouse/pointer activity is detected over the catch zone (`modal__motion-catcher`), fading out (`modal--chrome-visible` toggled off) after 1.5 seconds of idle time
   - Includes a quick navigation panel (`modal__quick-controls`) with custom selectors to switch seasons and episodes on the fly without exiting the player
+- **Netflix browse** (`/netflix`): **Horizontal Rows**
+  - Reuses tokens/colors; differs in layout only
+  - Rows (`.nf-row`) with horizontal scroll (`.nf-row__track`), snap, arrow affordances
+  - Cards scale slightly on hover/focus; detail opens as overlay on the row
+  - Styles live in `public/css/netflix.css`
+- **Workbench TV (immersive):** sidebar + app nav auto-hide on desktop (`workbench--immersive`)
+  - Sidebar fixed left, appears on mouse move or channel change (`workbench--chrome-visible`)
+  - Player full-bleed underneath; see `public/css/workbench.css`
 
 
 ## Theme — atmospheric Bloom (locked)
