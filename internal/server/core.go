@@ -61,13 +61,54 @@ func CorsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// resolveBaseDir encontra a raiz do projeto (.env / go.mod) em dev e em binário compilado.
+func resolveBaseDir() string {
+	if dir := strings.TrimSpace(os.Getenv("MEUPLAYER_BASE_DIR")); dir != "" {
+		if abs, err := filepath.Abs(dir); err == nil {
+			return abs
+		}
+		return dir
+	}
+
+	markers := []string{".env", "go.mod"}
+	tryDir := func(dir string) (string, bool) {
+		abs, err := filepath.Abs(dir)
+		if err != nil {
+			return "", false
+		}
+		for _, marker := range markers {
+			if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
+				return abs, true
+			}
+		}
+		return "", false
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		if dir, ok := tryDir(cwd); ok {
+			return dir
+		}
+	}
+
+	if execPath, err := os.Executable(); err == nil {
+		if dir, ok := tryDir(filepath.Dir(execPath)); ok {
+			return dir
+		}
+	}
+
+	if dir, ok := tryDir(filepath.Dir(os.Args[0])); ok {
+		return dir
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		return cwd
+	}
+	return "."
+}
+
 // SetupPaths configura os caminhos base, de dados e estáticos.
 func SetupPaths() {
-	var err error
-	BaseDir, err = filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		BaseDir = "."
-	}
+	BaseDir = resolveBaseDir()
 
 	UserDataDir = os.Getenv("MEUPLAYER_USER_DATA")
 	if UserDataDir == "" {

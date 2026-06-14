@@ -750,7 +750,6 @@ function App() {
   const [doramaLoading, setDoramaLoading] = useState(false);
   const [tmdbConfigured, setTmdbConfigured] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
-  const [liveQuick, setLiveQuick] = useState([]);
   const metaMapRef = useRef({});
   const modalChromeTimerRef = useRef(null);
   const loadHistory = () => {
@@ -765,31 +764,6 @@ function App() {
     } catch (e) {
       setHistoryItems([]);
     }
-  };
-
-  // Sprint 2: Carrega canais rápidos para o dashboard unificado (usa unified API do Sprint 4)
-  const loadLiveQuick = async () => {
-    try {
-      const res = await fetch("/api/channels/unified");
-      const data = await res.json();
-      const items = (data.data || []).slice(0, 6);
-      setLiveQuick(items);
-    } catch {
-      // Fallback para locais
-      try {
-        const res = await fetch("/canais.json");
-        const items = await res.json();
-        setLiveQuick((items || []).slice(0, 6).map(c => ({
-          ...c,
-          source: "local"
-        })));
-      } catch {}
-    }
-  };
-  const openLiveChannel = channel => {
-    if (!channel || !channel.id) return;
-    const url = `/rede-buzz?canal=${encodeURIComponent(channel.id)}`;
-    window.location.href = url;
   };
   const savePlaybackProgress = (item, season = "1", episode = "1") => {
     try {
@@ -822,7 +796,6 @@ function App() {
   };
   useEffect(() => {
     loadHistory();
-    loadLiveQuick();
   }, [modal.open]);
   useEffect(() => {
     if (modal.open && modal.id) {
@@ -1903,43 +1876,7 @@ function App() {
           openModal(clicked, clicked.__resume?.season, clicked.__resume?.episode);
         }, 200);
       }
-    }), !searchResults && !genreResults && liveQuick.length > 0 && /*#__PURE__*/React.createElement("section", {
-      className: "nf-row",
-      "aria-labelledby": "nf-row-live"
-    }, /*#__PURE__*/React.createElement("header", {
-      className: "nf-row__header"
-    }, /*#__PURE__*/React.createElement("h2", {
-      className: "nf-row__title",
-      id: "nf-row-live"
-    }, "TV ao Vivo"), /*#__PURE__*/React.createElement("span", {
-      className: "nf-row__status"
-    }, "Canais r\xE1pidos \xB7", " ", /*#__PURE__*/React.createElement("a", {
-      href: "/rede-buzz",
-      style: {
-        color: "var(--color-accent)"
-      }
-    }, "Abrir TV completa"))), /*#__PURE__*/React.createElement("div", {
-      className: "nf-row__viewport"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "nf-row__track"
-    }, liveQuick.map((ch, idx) => /*#__PURE__*/React.createElement("button", {
-      key: idx,
-      type: "button",
-      className: "card card--compact nf-live-card",
-      onClick: () => openLiveChannel(ch)
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: "0.5rem 0.75rem"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 600
-      }
-    }, ch.nome || ch.id), /*#__PURE__*/React.createElement("small", {
-      style: {
-        opacity: 0.7
-      }
-    }, ch.source === "local" ? "Local" : "Rede Buzz"))))))), filteredRows.map(row => /*#__PURE__*/React.createElement(Carousel, {
+    }), filteredRows.map(row => /*#__PURE__*/React.createElement(Carousel, {
       key: row.key,
       title: row.title,
       eyebrow: row.eyebrow,
@@ -1999,48 +1936,7 @@ function App() {
       }, 200);
     },
     compact: true
-  })))), !searchResults && !genreResults && (liveQuick.length > 0 || true) && /*#__PURE__*/React.createElement("section", {
-    className: "row",
-    "aria-labelledby": "row-live"
-  }, /*#__PURE__*/React.createElement("header", {
-    className: "row__header"
-  }, /*#__PURE__*/React.createElement("h2", {
-    className: "row__title",
-    id: "row-live"
-  }, "TV ao Vivo"), /*#__PURE__*/React.createElement("span", {
-    className: "row__status"
-  }, "Canais r\xE1pidos \xB7 ", /*#__PURE__*/React.createElement("a", {
-    href: "/rede-buzz",
-    style: {
-      color: 'var(--color-accent)'
-    }
-  }, "Abrir TV completa"))), /*#__PURE__*/React.createElement("div", {
-    className: "row__grid"
-  }, liveQuick.length > 0 ? liveQuick.map((ch, idx) => /*#__PURE__*/React.createElement("button", {
-    key: idx,
-    type: "button",
-    className: "card card--compact",
-    onClick: () => openLiveChannel(ch),
-    style: {
-      textAlign: 'left',
-      cursor: 'pointer'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '0.5rem 0.75rem'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600
-    }
-  }, ch.nome || ch.id), /*#__PURE__*/React.createElement("small", {
-    style: {
-      opacity: 0.7
-    }
-  }, ch.source === 'local' ? 'Local' : 'Rede Buzz')))) : /*#__PURE__*/React.createElement("button", {
-    className: "btn btn--primary",
-    onClick: () => window.location.href = '/rede-buzz'
-  }, "Abrir TV ao Vivo"))), filteredRows.map(row => /*#__PURE__*/React.createElement(GridRow, {
+  })))), filteredRows.map(row => /*#__PURE__*/React.createElement(GridRow, {
     key: row.key,
     title: row.title,
     eyebrow: row.eyebrow,
