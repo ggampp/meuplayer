@@ -39,6 +39,33 @@
 
   const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime', '/dorama', '/netflix']);
 
+  const DEFAULT_PROVIDERS = [
+    {
+      id: 'max',
+      name: 'Max',
+      url: 'https://www.hbomax.com/br/pt',
+      icon: '/img/providers/max.svg',
+    },
+    {
+      id: 'netflix',
+      name: 'Netflix',
+      url: 'https://www.netflix.com/browse',
+      icon: '/img/providers/netflix.svg',
+    },
+    {
+      id: 'recordplus',
+      name: 'Record Plus',
+      url: 'https://www.recordplus.com/Live/LiveEvent/180?groupId=7',
+      icon: '/img/providers/recordplus.svg',
+    },
+    {
+      id: 'primevideo',
+      name: 'Prime Video',
+      url: 'https://www.primevideo.com/region/na/storefront',
+      icon: '/img/providers/primevideo.svg',
+    },
+  ];
+
   const style = document.createElement('style');
   style.textContent = `
     .app-nav {
@@ -48,7 +75,7 @@
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: var(--space-2xs) var(--space-sm);
+      gap: var(--space-2xs) var(--space-xs);
       padding: var(--space-2xs) var(--space-md);
       min-height: 52px;
       background: oklch(16% 0.02 250 / 0.92);
@@ -61,24 +88,94 @@
     .app-nav__logo {
       font-family: var(--font-display);
       font-style: italic;
-      font-weight: 400;
+      font-weight: 600;
       font-size: 1.25rem;
       letter-spacing: -0.02em;
       color: var(--color-ink);
       text-decoration: none;
-      margin-right: var(--space-md);
+      margin-right: var(--space-xs);
       padding: var(--space-3xs) var(--space-2xs);
     }
     .app-nav__logo:hover {
       color: var(--color-accent);
     }
+
+    .app-nav__providers {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      overflow-x: auto;
+      padding: 2px 0;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      margin-right: auto;
+    }
+    .app-nav__providers::-webkit-scrollbar {
+      display: none;
+    }
+    .app-nav__provider-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.65rem;
+      height: 30px;
+      border-radius: 999px;
+      background: oklch(22% 0.02 250);
+      border: 1px solid var(--color-rule);
+      color: var(--color-ink-2);
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .app-nav__provider-chip:hover {
+      background: oklch(28% 0.02 250);
+      border-color: var(--color-accent);
+      color: var(--color-ink);
+      transform: translateY(-1px);
+    }
+    .app-nav__provider-chip--active {
+      background: var(--color-accent);
+      color: var(--color-accent-ink);
+      border-color: var(--color-accent);
+      font-weight: 700;
+    }
+    .app-nav__provider-chip img {
+      height: 16px;
+      width: auto;
+      max-width: 45px;
+      object-fit: contain;
+      border-radius: 2px;
+    }
+    .app-nav__add-provider-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.65rem;
+      height: 30px;
+      border-radius: 999px;
+      background: transparent;
+      border: 1px dashed var(--color-accent);
+      color: var(--color-accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .app-nav__add-provider-btn:hover {
+      background: var(--color-accent-soft);
+      transform: translateY(-1px);
+    }
+
     .app-nav__link {
       font-family: var(--font-body);
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       letter-spacing: 0.02em;
       color: var(--color-ink-2);
       text-decoration: none;
-      padding: 0.4rem 0.85rem;
+      padding: 0.35rem 0.75rem;
       border-radius: 999px;
       transition: color var(--dur-short, 220ms) cubic-bezier(0.16, 1, 0.3, 1),
         background-color var(--dur-short, 220ms) cubic-bezier(0.16, 1, 0.3, 1);
@@ -119,7 +216,7 @@
       cursor: pointer;
       min-width: 8rem;
     }
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
       .app-nav__link {
         display: none;
       }
@@ -141,6 +238,8 @@
   document.head.appendChild(style);
 
   const currentPath = window.location.pathname;
+  const currentParams = new URLSearchParams(window.location.search);
+  const activePlayerUrl = currentParams.get('url') || '';
 
   function isCatalogListPage() {
     const path = currentPath.replace(/\/$/, '') || '/';
@@ -161,6 +260,75 @@
   logo.href = '/';
   logo.textContent = 'MeuPlayer';
   nav.appendChild(logo);
+
+  // Container para chips dos Provedores (Super Player)
+  const providersContainer = document.createElement('div');
+  providersContainer.className = 'app-nav__providers';
+  providersContainer.setAttribute('aria-label', 'Plataformas de Vídeo');
+  nav.appendChild(providersContainer);
+
+  async function renderProviders() {
+    let providers = DEFAULT_PROVIDERS;
+    try {
+      const res = await fetch('/api/providers');
+      if (res.ok) {
+        providers = await res.json();
+      }
+    } catch (e) {
+      console.warn('Usando provedores padrão para navegação:', e);
+    }
+
+    providersContainer.innerHTML = '';
+
+    providers.forEach((provider) => {
+      const chip = document.createElement('a');
+      const playerLink = '/player?url=' + encodeURIComponent(provider.url) + '&name=' + encodeURIComponent(provider.name) + '&icon=' + encodeURIComponent(provider.icon);
+      
+      const isCurrentActive = currentPath === '/player' && (activePlayerUrl === provider.url || activePlayerUrl.includes(provider.url));
+      chip.className = 'app-nav__provider-chip' + (isCurrentActive ? ' app-nav__provider-chip--active' : '');
+      chip.href = playerLink;
+      chip.title = `Abrir ${provider.name} no Super Player`;
+
+      const img = document.createElement('img');
+      img.src = provider.icon || '/img/providers/default-provider.svg';
+      img.alt = provider.name;
+      img.onerror = () => { img.src = '/img/providers/default-provider.svg'; };
+
+      const span = document.createElement('span');
+      span.textContent = provider.name;
+
+      chip.appendChild(img);
+      chip.appendChild(span);
+      providersContainer.appendChild(chip);
+    });
+
+    // Botão "+ Novo Provedor"
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'app-nav__add-provider-btn';
+    addBtn.innerHTML = '<span>+ Novo Provedor</span>';
+    addBtn.title = 'Cadastrar nova plataforma de vídeo';
+
+    addBtn.addEventListener('click', () => {
+      if (window.MeuPlayerProviderModal) {
+        window.MeuPlayerProviderModal.open();
+      } else {
+        const script = document.createElement('script');
+        script.src = '/provider-modal.js';
+        script.onload = () => {
+          if (window.MeuPlayerProviderModal) {
+            window.MeuPlayerProviderModal.open();
+          }
+        };
+        document.body.appendChild(script);
+      }
+    });
+
+    providersContainer.appendChild(addBtn);
+  }
+
+  renderProviders();
+  window.addEventListener('meuplayer:providers-changed', renderProviders);
 
   const mobileNav = document.createElement('select');
   mobileNav.className = 'app-nav__mobile-select';

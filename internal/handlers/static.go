@@ -30,6 +30,8 @@ func HandleStaticOrSPA(w http.ResponseWriter, r *http.Request) {
 		target = "downloads.html"
 	} else if path == "/netflix" || path == "/netflix/" {
 		target = "netflix.html"
+	} else if path == "/player" || path == "/player/" {
+		target = "player.html"
 	} else {
 		routeMap := []string{"/filme", "/anime", "/serie", "/dorama"}
 		for _, prefix := range routeMap {

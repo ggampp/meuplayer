@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer · Super Player</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,144,400;1,144,500&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #090910;
+        color: var(--color-ink, #f1f5f9);
+        overflow: hidden;
+      }
+      .super-player-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: calc(100vh - 54px);
+        position: relative;
+        background: #000;
+      }
+      .player-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0.85rem;
+        background: oklch(16% 0.02 250);
+        border-bottom: 1px solid var(--color-rule, oklch(28% 0.015 250));
+        flex-shrink: 0;
+        z-index: 20;
+      }
+      .player-toolbar__badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.65rem;
+        background: oklch(22% 0.02 250);
+        border: 1px solid var(--color-rule, oklch(28% 0.015 250));
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--color-ink);
+        white-space: nowrap;
+      }
+      .player-toolbar__badge img {
+        height: 18px;
+        max-width: 60px;
+        object-fit: contain;
+      }
+      .player-toolbar__btn {
+        background: transparent;
+        border: 1px solid var(--color-rule, oklch(28% 0.015 250));
+        color: var(--color-ink-2);
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 150ms ease;
+        flex-shrink: 0;
+      }
+      .player-toolbar__btn:hover {
+        color: var(--color-ink);
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--color-accent);
+      }
+      .player-toolbar__url-form {
+        flex: 1;
+        display: flex;
+        align-items: center;
+      }
+      .player-toolbar__url-input {
+        width: 100%;
+        height: 32px;
+        background: oklch(12% 0.02 250);
+        border: 1px solid var(--color-rule, oklch(28% 0.015 250));
+        border-radius: 8px;
+        padding: 0 0.75rem;
+        color: var(--color-ink-2);
+        font-family: var(--font-mono, monospace);
+        font-size: 0.8rem;
+        outline: none;
+      }
+      .player-toolbar__url-input:focus {
+        color: var(--color-ink);
+        border-color: var(--color-accent);
+      }
+      .player-viewport {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: #000000;
+      }
+      .player-viewport webview,
+      .player-viewport iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        display: block;
+      }
+      .player-loading {
+        position: absolute;
+        inset: 0;
+        background: #0b0b12;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        z-index: 10;
+        transition: opacity 300ms ease;
+      }
+      .player-loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top-color: var(--color-accent, oklch(78% 0.15 65));
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/nav.js"></script>
+
+    <div class="super-player-container">
+      <div class="player-toolbar">
+        <div class="player-toolbar__badge" id="playerBadge">
+          <img id="playerBadgeIcon" src="/img/providers/max.svg" alt="Logo" />
+          <span id="playerBadgeName">Plataforma</span>
+        </div>
+
+        <button class="player-toolbar__btn" id="btnBack" title="Voltar (←)">←</button>
+        <button class="player-toolbar__btn" id="btnForward" title="Avançar (→)">→</button>
+        <button class="player-toolbar__btn" id="btnReload" title="Recarregar (↻)">↻</button>
+        <button class="player-toolbar__btn" id="btnHome" title="Início">🏠</button>
+
+        <form class="player-toolbar__url-form" id="urlForm">
+          <input type="url" class="player-toolbar__url-input" id="urlInput" placeholder="URL da transmissão..." />
+        </form>
+
+        <button class="player-toolbar__btn" id="btnOpenExternal" title="Abrir no Navegador Externo">↗</button>
+        <button class="player-toolbar__btn" id="btnFullscreen" title="Tela Cheia (F11)">⛶</button>
+      </div>
+
+      <div class="player-viewport" id="playerViewport">
+        <div class="player-loading" id="playerLoading">
+          <div class="spinner"></div>
+          <span id="playerLoadingText">Carregando Plataforma...</span>
+        </div>
+      </div>
+    </div>
+
+    <script src="/provider-modal.js"></script>
+    <script src="/player.js"></script>
+  </body>
+</html>

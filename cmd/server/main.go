@@ -24,6 +24,7 @@ func main() {
 
 	// API e Proxies
 	mux.HandleFunc("/api/settings", handlers.HandleSettings)
+	mux.HandleFunc("/api/providers", handlers.HandleProviders)
 	mux.HandleFunc("/api/lista", handlers.HandleLista)
 	mux.HandleFunc("/api/calendario", handlers.HandleCalendario)
 	mux.HandleFunc("/api/tmdb", handlers.HandleTmdbDetail)

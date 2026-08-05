@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" fill="none">
+  <rect width="120" height="40" rx="8" fill="#0F1923"/>
+  <circle cx="26" cy="20" r="10" fill="#00E676"/>
+  <path d="M22 14L32 20L22 26V14Z" fill="#0F1923"/>
+  <text x="42" y="25" fill="#FFFFFF" font-family="Inter, sans-serif" font-weight="800" font-size="12" letter-spacing="0.5">RECORD<tspan fill="#00E676">+</tspan></text>
+</svg>

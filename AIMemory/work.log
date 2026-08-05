@@ -1,0 +1,11 @@
+# work.log — append-only event stream
+# Format per event:
+#   ## <RFC3339 UTC> | <agent> | <EVENT_TYPE> | <task-id-or-->
+#   Summary: <one line>
+#   Handoff: <relative path, optional>
+#
+# Never edit or delete past entries. Append only.
+
+## 2026-06-30T00:48:23Z | memoria | SESSION_START | -
+Summary: Initialized AIMemory/ via memoria init
+
