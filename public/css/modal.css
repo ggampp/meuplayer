@@ -1,17 +1,17 @@
 /* —— Modal player ——————————————————————————————————————————————— */
 
-body.player-open .app-nav {
-  display: none;
-}
+/* Hub de plataformas permanece sempre visível (não esconder .app-nav) */
 
 body.player-open .modal {
-  height: 100vh;
+  height: calc(100vh - var(--app-nav-offset, 56px));
+  height: calc(100dvh - var(--app-nav-offset, 56px));
 }
 
 .modal {
   position: relative;
   display: none;
-  height: calc(100vh - 52px);
+  height: calc(100vh - var(--app-nav-offset, 56px));
+  height: calc(100dvh - var(--app-nav-offset, 56px));
   min-height: 540px;
   overflow: hidden;
   background: #000;

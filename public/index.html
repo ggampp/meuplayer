@@ -2,10 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MeuPlayer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,24 +14,17 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <script src="/nav.js"></script>
+    <script type="module" src="/js/nav.js"></script>
     <div id="root"></div>
-
-    <script
-      crossorigin
-      src="https://unpkg.com/react@18/umd/react.production.min.js"
-    ></script>
-    <script
-      crossorigin
-      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
-    ></script>
-    <script src="/app.js"></script>
-    <script src="/spatial-nav.js"></script>
+    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/spatial-nav.js"></script>
     <script>
-      // PWA registration (Sprint 5) - basic shell caching for web version
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker
+            .register('/sw.js?v=hub3')
+            .then((reg) => reg.update().catch(() => {}))
+            .catch(() => {});
         });
       }
     </script>

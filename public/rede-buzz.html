@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
@@ -11,10 +11,10 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,144,400;1,144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
     />
     <link rel="stylesheet" href="/tokens.css" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=hub3" />
   </head>
   <body>
-    <script src="/nav.js"></script>
+    <script type="module" src="/js/nav.js"></script>
     <main class="workbench workbench--immersive" id="rede-buzz">
       <aside class="workbench__sidebar">
         <header class="workbench__header">
@@ -88,22 +88,18 @@
       </div>
     </main>
 
-    <script src="/rede-buzz-store.js"></script>
-    <script src="/rede-buzz-ui.js"></script>
-    <script>
-      // Aviso de ambiente (injetado pelo Electron)
-      (function () {
-        const isElectron = !!(window.__MEUPLAYER_ENV && window.__MEUPLAYER_ENV.isElectron);
-        if (!isElectron) {
-          const banner = document.createElement("div");
-          banner.style.cssText = "background:var(--color-accent-soft);color:var(--color-ink);padding:6px 12px;border-radius:6px;font-size:0.8rem;margin:8px 0;border:1px solid var(--color-rule-2);";
-          banner.textContent = "Usando no navegador. A experiência completa de canais (teclado + autoplay) é melhor no app desktop.";
-          const header = document.querySelector(".workbench__header");
-          if (header) header.after(banner);
-        }
-      })();
-
-      MeuPlayerRedeBuzzUI.init({ mode: "all" });
+    <script type="module">
+      import "/js/rede-buzz-store.js";
+      import "/js/rede-buzz-ui.js";
+      const isElectron = !!(window.__MEUPLAYER_ENV && window.__MEUPLAYER_ENV.isElectron);
+      if (!isElectron && "all" === "all") {
+        const banner = document.createElement("div");
+        banner.style.cssText = "background:var(--color-accent-soft);color:var(--color-ink);padding:6px 12px;border-radius:6px;font-size:0.8rem;margin:8px 0;border:1px solid var(--color-rule-2);";
+        banner.textContent = "Usando no navegador. A experiência completa de canais é melhor no app desktop.";
+        const header = document.querySelector(".workbench__header");
+        if (header) header.after(banner);
+      }
+      window.MeuPlayerRedeBuzzUI?.init({ mode: "all" });
     </script>
   </body>
 </html>

@@ -2,11 +2,8 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1"
-    />
-    <title>MeuPlayer · Netflix</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeuPlayer · Fileiras</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,29 +14,12 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <script src="/nav.js"></script>
+    <script type="module" src="/js/nav.js"></script>
     <div id="root"></div>
-
     <script>
       window.MEUPLAYER_LAYOUT = "netflix";
     </script>
-    <script
-      crossorigin
-      src="https://unpkg.com/react@18/umd/react.production.min.js"
-    ></script>
-    <script
-      crossorigin
-      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
-    ></script>
-    <script src="/app.js"></script>
-    <script src="/spatial-nav.js"></script>
-    <script>
-      // PWA registration - basic shell caching for web version
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-      }
-    </script>
+    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/spatial-nav.js"></script>
   </body>
 </html>

@@ -1,0 +1,472 @@
+/* Hallmark · Platform Hub chrome · design-system: design.md */
+
+.app-nav {
+  --hub-chip-h: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex !important;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  visibility: visible !important;
+  background:
+    linear-gradient(
+      180deg,
+      oklch(16% 0.025 250 / 0.98) 0%,
+      oklch(13% 0.02 250 / 0.94) 100%
+    );
+  border-bottom: 1px solid var(--color-rule);
+  box-shadow: 0 8px 28px oklch(8% 0.02 250 / 0.35);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  flex-shrink: 0;
+  font-family: var(--font-body);
+}
+
+/* Hub sempre no fluxo — nunca esconder por modos imersivos legados */
+body.player-open .app-nav,
+body:has(.workbench--immersive) .app-nav,
+body:has(.workbench--immersive):not(.workbench-chrome-visible) .app-nav {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  visibility: visible !important;
+}
+
+.app-nav__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: var(--space-2xs) var(--space-xs);
+  padding: 0.45rem var(--space-md);
+  min-height: 52px;
+}
+
+.app-nav__row::-webkit-scrollbar {
+  display: none;
+}
+
+.app-nav__row--primary {
+  min-height: 56px;
+  gap: 0.65rem;
+}
+
+.app-nav__row--secondary {
+  min-height: 42px;
+  padding-top: 0.15rem;
+  padding-bottom: 0.45rem;
+  border-top: 1px solid oklch(28% 0.015 250 / 0.4);
+  background: oklch(11% 0.02 250 / 0.55);
+}
+
+/* Wordmark */
+.app-nav__logo {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.28rem;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  text-decoration: none;
+  padding: var(--space-3xs) var(--space-2xs);
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color var(--dur-short) var(--ease-out);
+}
+
+.app-nav__logo:hover {
+  color: var(--color-accent);
+}
+
+.app-nav__logo:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Platform rail */
+.app-nav__platforms {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 4px 6px;
+  background: oklch(100% 0 0 / 0.035);
+  border: 1px solid oklch(28% 0.015 250 / 0.85);
+  border-radius: var(--radius-pill);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.04);
+}
+
+.app-nav__platforms::-webkit-scrollbar {
+  display: none;
+}
+
+.app-nav__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--color-rule-2);
+  margin: 0 0.2rem;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* Chips */
+.app-nav__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.75rem;
+  height: var(--hub-chip-h);
+  border-radius: var(--radius-pill);
+  background: oklch(22% 0.02 250 / 0.9);
+  border: 1px solid transparent;
+  color: var(--color-ink-2);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    color var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out),
+    transform var(--dur-short) var(--ease-out);
+}
+
+.app-nav__chip:hover {
+  background: oklch(28% 0.02 250);
+  border-color: oklch(36% 0.02 250 / 0.8);
+  color: var(--color-ink);
+  transform: translateY(-1px);
+}
+
+.app-nav__chip--active {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-color: var(--color-accent);
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px oklch(78% 0.15 65 / 0.25),
+    0 4px 14px oklch(78% 0.15 65 / 0.28);
+}
+
+.app-nav__chip--active:hover {
+  background: var(--color-accent-2);
+  border-color: var(--color-accent-2);
+  color: var(--color-accent-ink);
+  transform: translateY(-1px);
+}
+
+.app-nav__chip--native .app-nav__chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  opacity: 0.9;
+}
+
+.app-nav__chip--native .app-nav__chip-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.app-nav__chip img {
+  height: 15px;
+  width: auto;
+  max-width: 48px;
+  object-fit: contain;
+  border-radius: 2px;
+}
+
+.app-nav__chip--active img {
+  /* keep logos readable on amber */
+  filter: none;
+}
+
+.app-nav__chip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Live pulse on TV when active */
+.app-nav__chip--live::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: hub-live-pulse 1.8s var(--ease-out) infinite;
+  opacity: 0.85;
+}
+
+.app-nav__chip--active.app-nav__chip--live::after {
+  background: var(--color-accent-ink);
+}
+
+@keyframes hub-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 oklch(78% 0.15 65 / 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 6px oklch(78% 0.15 65 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 oklch(78% 0.15 65 / 0);
+  }
+}
+
+/* + Novo */
+.app-nav__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.7rem;
+  height: var(--hub-chip-h);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1px dashed oklch(78% 0.15 65 / 0.65);
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background-color var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out),
+    transform var(--dur-short) var(--ease-out);
+}
+
+.app-nav__add:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.app-nav__add:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.app-nav__add-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* Utilities */
+.app-nav__utilities {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding-left: 0.25rem;
+}
+
+.app-nav__util {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 0.65rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  color: var(--color-ink-3);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    color var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out);
+}
+
+.app-nav__util:hover {
+  color: var(--color-ink);
+  background: oklch(28% 0.015 250 / 0.55);
+  border-color: var(--color-rule);
+}
+
+.app-nav__util--active {
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.app-nav__util svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.app-nav__util-label {
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .app-nav__util-label {
+    display: inline;
+  }
+}
+
+/* Sub-nav links */
+.app-nav__subnav {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-nav__subnav::-webkit-scrollbar {
+  display: none;
+}
+
+.app-nav__link {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  letter-spacing: 0.015em;
+  color: var(--color-ink-2);
+  text-decoration: none;
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    color var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out);
+}
+
+.app-nav__link:hover {
+  color: var(--color-ink);
+  background: oklch(28% 0.015 250 / 0.55);
+}
+
+.app-nav__link--active {
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+  font-weight: 600;
+}
+
+.app-nav__link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Filters portal slot */
+.app-nav__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.app-nav__filters:empty {
+  display: none;
+}
+
+/* Mobile selects */
+.app-nav__mobile-select {
+  display: none;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--color-ink);
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  min-width: 7.5rem;
+  flex-shrink: 0;
+}
+
+.app-nav__mobile-select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .app-nav__platforms {
+    display: none;
+  }
+
+  .app-nav__subnav .app-nav__link {
+    display: none;
+  }
+
+  .app-nav__util-label {
+    display: none;
+  }
+
+  .app-nav__mobile-select {
+    display: block;
+  }
+
+  .app-nav__row {
+    padding: 0.4rem var(--space-sm);
+    gap: 0.45rem;
+  }
+
+  .app-nav__filters {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .app-nav__utilities {
+    gap: 0.15rem;
+  }
+
+  .app-nav__util {
+    padding: 0;
+    width: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-nav__chip,
+  .app-nav__add,
+  .app-nav__util,
+  .app-nav__link {
+    transition: none;
+  }
+
+  .app-nav__chip:hover,
+  .app-nav__add:hover {
+    transform: none;
+  }
+
+  .app-nav__chip--live::after {
+    animation: none;
+  }
+}

@@ -1,11 +1,13 @@
 {
   "name": "meuplayer",
-  "version": "1.1.0",
-  "description": "MeuPlayer Desktop",
+  "version": "1.2.0",
+  "description": "MeuPlayer Desktop + Android TV",
   "main": "main.js",
   "scripts": {
+    "dev:web": "vite",
+    "build:frontend": "vite build",
+    "typecheck": "tsc --noEmit",
     "start": "npm run build:frontend && electron .",
-    "build:frontend": "babel public/app.jsx --out-file public/app.js --presets=@babel/preset-react",
     "icons": "python scripts/generate-icons.py",
     "build:server": "powershell -ExecutionPolicy Bypass -File scripts/build-server.ps1",
     "build:win": "npm run build:frontend && npm run icons && npm run build:server && electron-builder --win",
@@ -18,9 +20,16 @@
     "icon": "build/icon.png",
     "files": [
       "main.js",
+      "preload.js",
       "public/**/*",
       "!public/cache/**",
-      "!public/app.jsx"
+      "!public/app.jsx",
+      "!public/app.js",
+      "!public/nav.js",
+      "!public/player.js",
+      "!public/provider-modal.js",
+      "!public/spatial-nav.js",
+      "!public/rede-buzz-*.js"
     ],
     "extraResources": [
       {
@@ -30,7 +39,18 @@
       {
         "from": "public",
         "to": "public",
-        "filter": ["**/*", "!cache/**", "!app.jsx"]
+        "filter": [
+          "**/*",
+          "!cache/**",
+          "!app.jsx",
+          "!app.js",
+          "!nav.js",
+          "!player.js",
+          "!provider-modal.js",
+          "!spatial-nav.js",
+          "!rede-buzz-store.js",
+          "!rede-buzz-ui.js"
+        ]
       }
     ],
     "publish": {
@@ -55,11 +75,17 @@
       "icon": "build/icon.png"
     }
   },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
   "devDependencies": {
-    "@babel/cli": "^7.24.0",
-    "@babel/core": "^7.24.0",
-    "@babel/preset-react": "^7.23.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
     "electron": "^35.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
   }
 }

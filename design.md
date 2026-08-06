@@ -51,6 +51,13 @@ they vary only in component archetypes.
 - **Workbench TV (immersive):** sidebar + app nav auto-hide on desktop (`workbench--immersive`)
   - Sidebar fixed left, appears on mouse move or channel change (`workbench--chrome-visible`)
   - Player full-bleed underneath; see `public/css/workbench.css`
+- **Platform Hub chrome** (global `nav.js` + `public/css/hub.css`): **two-tier app shell**
+  - Primary row: wordmark + platform rail (native MeuPlayer / TV + external streamings + “+ Novo”) + icon utilities (Downloads, Config)
+  - Secondary row (contextual only): catalog sections when MeuPlayer is active; TV Canais/Favoritos when TV is active; none on external Super Player embeds
+  - Platform chips share one glass pill rail; active chip uses accent fill + soft bloom; natives use stroke icons; TV active shows live pulse
+  - Super Player (`/player` + `public/css/player-shell.css`) is the host for external platforms, not a top-level nav item
+  - Height is published as `--app-nav-offset` for workbench layout math
+  - Platform hub chrome is **always visible** (never auto-hidden by TV immersive or VOD player-open); only the TV sidebar auto-hides
 
 
 ## Theme — atmospheric Bloom (locked)

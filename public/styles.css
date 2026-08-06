@@ -1,6 +1,7 @@
 /* MeuPlayer styles — agregador. Partials em public/css/ */
 
 @import url("/css/base.css");
+@import url("/css/hub.css");
 @import url("/css/hero.css");
 @import url("/css/buttons.css");
 @import url("/css/catalog.css");

@@ -8,9 +8,10 @@ MeuPlayer é um aplicativo desktop e TV Box de catálogo e player multimídia: *
 - **Layout Netflix:** Rota `/netflix` com fileiras horizontais.
 - **Cache:** SQLite (padrão) ou PostgreSQL (`CACHE_DATABASE_URL`).
 - **Elenco e filmografia:** Detalhe de título e página de ator.
+- **Hub de plataformas:** barra no topo com MeuPlayer, TV e streamings (Max, Netflix, etc.); sub-nav de catálogo só no MeuPlayer.
 - **Player imersivo:** Tela cheia, controles com auto-hide, botão flutuante para detalhes.
 - **Controle remoto (SSE):** QR em Configurações → `/remote.html`.
-- **TV ao vivo:** `canais.json`, Rede Buzz, favoritos; menu flutuante com auto-hide.
+- **TV ao vivo:** plataforma nativa no hub; `canais.json`, Rede Buzz, favoritos; menu flutuante com auto-hide.
 - **Filtro adulto:** Bloqueio em TMDB e Rede Buzz.
 - **Downloads no site:** `/downloads` com executáveis hospedados em `public/downloads/` (versionados para uso sem clonar o repo).
 
@@ -19,22 +20,53 @@ MeuPlayer é um aplicativo desktop e TV Box de catálogo e player multimídia: *
 | Camada | Tecnologia |
 |--------|------------|
 | Desktop | Electron 35 |
-| Servidor | Go (`main.go`, `handlers_*.go`, `db.go`) |
-| Frontend | React 18 via CDN; `app.jsx` → `app.js` (Babel) |
+| Servidor | Go (`cmd/server`, `internal/*`) |
+| Frontend | **TypeScript + React 18 + Vite** (`src/` → `public/js/`) |
 | Cache | SQLite / PostgreSQL |
-| Deploy | Docker Compose + Traefik (VPS) |
-| TV Box | Android (`/android`) |
+| Deploy | Docker Compose (build multi-stage Node+Go) |
+| TV Box | **Kotlin** WebView leanback (`/android`) |
 
 ## Como rodar (desenvolvimento)
 
 ```powershell
 npm install
-npm start
+npm run build:frontend   # Vite: src/** → public/js/**
+npm start                # build:frontend + Electron (sobe Go em dev)
 ```
 
-`npm start` compila o frontend (`build:frontend`) e abre o Electron. Em dev o servidor sobe com `go run ./cmd/server`.
+Scripts úteis:
 
-Requisitos: **Node.js**, **Go 1.22+** (para desenvolvimento e build do servidor).
+```powershell
+npm run build:frontend   # TypeScript/React → public/js
+npm run typecheck        # tsc --noEmit
+npm run dev:web          # Vite dev server (proxy /api → :8765)
+```
+
+Em dev o Electron sobe o servidor com `go run ./cmd/server` na porta `8765`.
+
+Requisitos: **Node.js 20+**, **Go 1.22+**.
+
+### Docker
+
+```powershell
+docker compose up -d --build
+# app em http://localhost:3000
+```
+
+### Android TV
+
+Pasta `android/` — shell Kotlin + WebView fullscreen (DPAD, MENU para URL do servidor).
+
+1. Suba o MeuPlayer na rede (`npm start` ou Docker na porta 3000).
+2. Android Studio → abrir `android/` → Run no device/TV.
+3. Na primeira abertura, informe a URL (ex. `http://192.168.0.10:3000`).
+4. **MENU** ou **BACK longo** altera a URL / limpa cache.
+
+```powershell
+# APK debug
+cd android
+# Build via Android Studio: Build → Build APK(s)
+```
 
 ## Configurações (TMDB)
 
@@ -68,10 +100,16 @@ npm run build:mac
 | `internal/cache/db.go` | Cache SQLite / PostgreSQL |
 | `internal/server/core.go` | Paths, CORS, chave TMDB, `FetchWithCache` |
 | `internal/handlers/*.go` | Handlers HTTP (tmdb, superflix, rede_buzz, remote, settings, static, misc) |
-| `public/app.jsx` | UI React principal |
-| `public/app.js` | Build de produção (gerado) |
-| `public/css/` | Partials de estilo |
+| `src/` | Frontend TypeScript (fonte da verdade) |
+| `src/app/` | Catálogo React (`App.tsx` + entry `main.tsx`) |
+| `src/components/` | UI reutilizável (MediaCard, Hero, Carousel, …) |
+| `src/lib/` | API, constants, helpers de mídia |
+| `src/nav/` | Hub de plataformas tipado |
+| `public/js/` | Bundle Vite gerado (`npm run build:frontend`) |
+| `public/css/` | Partials de estilo (`hub.css`, `player-shell.css`, …) |
 | `public/styles.css` | Agregador `@import` |
+| `public/*.html` | Shells multi-página (carregam `/js/*.js` como modules) |
+| `android/` | App TV (Kotlin WebView) |
 | `public/netflix.html` | Layout estilo Netflix |
 | `public/rede-buzz*.html` | TV ao vivo |
 | `public/downloads/` | Executáveis para outras máquinas |

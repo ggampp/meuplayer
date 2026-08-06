@@ -3,7 +3,8 @@
 .workbench {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  height: calc(100vh - 52px);
+  /* Primary + secondary hub rows when TV/MeuPlayer chrome is visible */
+  height: calc(100vh - var(--app-nav-offset, 94px));
   min-height: 540px;
   overflow: hidden;
 }
@@ -11,18 +12,14 @@
 .workbench__sidebar {
   border-right: 1px solid var(--color-rule);
   background: var(--color-paper);
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Rede Buzz: header + status + filters + list (4 rows) */
-.workbench__sidebar:has(.workbench__filters) {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-}
-
 .workbench__header {
+  flex-shrink: 0;
   padding: var(--space-md) var(--space-md) var(--space-2xs);
   display: grid;
   gap: var(--space-3xs);
@@ -80,6 +77,7 @@
 }
 
 .workbench__status {
+  flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.06em;
@@ -132,6 +130,7 @@
 .workbench__list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
   padding: 0 0 var(--space-md);
@@ -249,41 +248,27 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* Hub de plataformas sempre visível — só a sidebar da TV auto-hide */
   body:has(.workbench--immersive) .app-nav {
-    transition: opacity var(--dur-short) var(--ease-out),
-      transform var(--dur-short) var(--ease-out);
-  }
-
-  body:has(.workbench--immersive):not(.workbench-chrome-visible) .app-nav {
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(calc(-100% - 1px));
-  }
-
-  body:has(.workbench--immersive).workbench-chrome-visible .app-nav {
     opacity: 1;
     pointer-events: auto;
-    transform: translateY(0);
+    transform: none;
   }
 
   body:has(.workbench--immersive) .workbench--immersive {
-    height: 100vh;
-  }
-
-  body:has(.workbench--immersive).workbench-chrome-visible .workbench--immersive {
-    height: calc(100vh - 52px);
+    height: calc(100vh - var(--app-nav-offset, 94px));
+    height: calc(100dvh - var(--app-nav-offset, 94px));
   }
 
   .workbench--immersive .workbench__sidebar {
     position: fixed;
-    top: 52px;
+    top: var(--app-nav-offset, 94px);
     left: 0;
     width: 300px;
-    height: calc(100vh - 52px);
+    height: calc(100vh - var(--app-nav-offset, 94px));
+    height: calc(100dvh - var(--app-nav-offset, 94px));
     z-index: 45;
     border-right: 1px solid var(--color-rule);
     background: oklch(16% 0.02 250 / 0.94);

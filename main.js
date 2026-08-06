@@ -1,13 +1,16 @@
-const { app, BrowserWindow, session } = require('electron');
+const { app, BrowserWindow, BrowserView, session, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
 
 const PORT = 8765;
+const STREAM_PARTITION = 'persist:meuplayer-streaming';
 let pyProc = null;
 let mainWindow = null;
 let autoplayTimer = null;
+/** @type {BrowserView | null} */
+let streamView = null;
 
 function getUserDataPath() {
   return app.getPath('userData');
@@ -133,6 +136,124 @@ function getAppIconPath() {
   return fs.existsSync(candidate) ? candidate : undefined;
 }
 
+function normalizeBounds(bounds) {
+  const b = bounds || {};
+  return {
+    x: Math.max(0, Math.round(Number(b.x) || 0)),
+    y: Math.max(0, Math.round(Number(b.y) || 0)),
+    width: Math.max(100, Math.round(Number(b.width) || 800)),
+    height: Math.max(100, Math.round(Number(b.height) || 600)),
+  };
+}
+
+function destroyStreamView() {
+  if (!streamView) return;
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.removeBrowserView(streamView);
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (streamView.webContents && !streamView.webContents.isDestroyed()) {
+      streamView.webContents.destroy();
+    }
+  } catch {
+    /* ignore */
+  }
+  streamView = null;
+}
+
+function ensureStreamView() {
+  if (streamView) return streamView;
+  streamView = new BrowserView({
+    webPreferences: {
+      partition: STREAM_PARTITION,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      plugins: true,
+    },
+  });
+  // Match desktop Chrome UA (helps streaming sites)
+  try {
+    const ua = streamView.webContents.getUserAgent().replace(/Electron\/[\d.]+/, '').trim();
+    streamView.webContents.setUserAgent(
+      ua ||
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+    );
+  } catch {
+    /* ignore */
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setBrowserView(streamView);
+  }
+  return streamView;
+}
+
+function registerStreamIpc() {
+  ipcMain.handle('stream:open', async (_event, payload = {}) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { ok: false };
+    const url = String(payload.url || '').trim();
+    if (!url) return { ok: false, error: 'url required' };
+    const view = ensureStreamView();
+    const bounds = normalizeBounds(payload.bounds);
+    // Manual bounds only — hub chrome height is not a fixed window inset
+    view.setAutoResize({ width: false, height: false, horizontal: false, vertical: false });
+    view.setBounds(bounds);
+    try {
+      await view.webContents.loadURL(url);
+    } catch (err) {
+      console.error('[stream:open]', err);
+      return { ok: false, error: String(err && err.message ? err.message : err) };
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:resize', async (_event, payload = {}) => {
+    if (!streamView) return { ok: false };
+    streamView.setBounds(normalizeBounds(payload.bounds));
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:close', async () => {
+    destroyStreamView();
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:navigate', async (_event, payload = {}) => {
+    if (!streamView) return { ok: false };
+    const url = String(payload.url || '').trim();
+    if (!url) return { ok: false };
+    await streamView.webContents.loadURL(url);
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:go-back', async () => {
+    if (!streamView) return { ok: false };
+    if (streamView.webContents.canGoBack()) streamView.webContents.goBack();
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:go-forward', async () => {
+    if (!streamView) return { ok: false };
+    if (streamView.webContents.canGoForward()) streamView.webContents.goForward();
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:reload', async () => {
+    if (!streamView) return { ok: false };
+    streamView.webContents.reload();
+    return { ok: true };
+  });
+
+  ipcMain.handle('stream:get-url', async () => {
+    if (!streamView) return { ok: false, url: '' };
+    return { ok: true, url: streamView.webContents.getURL() };
+  });
+}
+
 function createWindow() {
   const iconPath = getAppIconPath();
   mainWindow = new BrowserWindow({
@@ -146,11 +267,31 @@ function createWindow() {
       webviewTag: true,
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+      sandbox: false,
     },
     show: false,
   });
 
   mainWindow.loadURL(`http://localhost:${PORT}/`);
+
+  // Leave Super Player → tear down BrowserView so it doesn't cover other pages
+  const maybeCloseStream = (_event, url) => {
+    try {
+      const u = new URL(url);
+      if (u.pathname !== '/player' && !u.pathname.startsWith('/player/')) {
+        destroyStreamView();
+      }
+    } catch {
+      destroyStreamView();
+    }
+  };
+  mainWindow.webContents.on('did-navigate', maybeCloseStream);
+  mainWindow.webContents.on('did-navigate-in-page', maybeCloseStream);
+
+  mainWindow.on('resize', () => {
+    // Renderer also sends bounds; keep last bounds if view exists
+  });
 
   // Injeta informações de ambiente para o frontend detectar Electron vs browser.
   // Usado principalmente nas páginas de Live (canais / rede-buzz) para fallbacks e avisos.
@@ -160,7 +301,8 @@ function createWindow() {
       window.__MEUPLAYER_ENV = {
         isElectron: true,
         platform: ${JSON.stringify(process.platform)},
-        version: ${JSON.stringify(app.getVersion ? app.getVersion() : '1.1.0')}
+        version: ${JSON.stringify(app.getVersion ? app.getVersion() : '1.2.0')},
+        hasDesktopBridge: !!(window.meuplayerDesktop && window.meuplayerDesktop.isDesktop)
       };
 
       if (!window.__meuPlayerAutoPlayBridge) {
@@ -224,6 +366,7 @@ function createWindow() {
   });
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('closed', () => {
+    destroyStreamView();
     mainWindow = null;
   });
 }
@@ -273,16 +416,106 @@ function scheduleChannelPlayerClicks(initialDelay = 1200) {
   }, initialDelay);
 }
 
-function blockPopupWindows() {
+/**
+ * Strip headers that prevent embedding streaming sites inside <webview>/iframe.
+ * Applied to default session + persist:meuplayer-streaming (Super Player).
+ */
+function stripFrameBlockingHeaders(targetSession) {
+  if (!targetSession || targetSession.__meuplayerFrameHeadersPatched) return;
+  targetSession.__meuplayerFrameHeadersPatched = true;
+
+  targetSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    for (const key of Object.keys(headers)) {
+      const lower = key.toLowerCase();
+      if (lower === 'x-frame-options') {
+        delete headers[key];
+        continue;
+      }
+      if (
+        lower === 'content-security-policy' ||
+        lower === 'content-security-policy-report-only'
+      ) {
+        const values = Array.isArray(headers[key]) ? headers[key] : [headers[key]];
+        headers[key] = values.map((value) =>
+          String(value)
+            // Allow embedding in our shell (sites often set frame-ancestors 'self')
+            .replace(/frame-ancestors[^;]*(;|$)/gi, '')
+            .replace(/;;+/g, ';')
+            .trim()
+        );
+      }
+    }
+    callback({ responseHeaders: headers });
+  });
+}
+
+/**
+ * Streaming platforms need real popups (login OAuth, cookie managers).
+ * TV/live pages still block ad popups.
+ */
+function configureWebContentsPolicy() {
   app.on('web-contents-created', (_event, contents) => {
+    // Ensure streaming partition also gets header stripping (created lazily)
+    try {
+      if (typeof contents.session !== 'undefined') {
+        stripFrameBlockingHeaders(contents.session);
+      }
+    } catch {
+      /* ignore */
+    }
+
     contents.setWindowOpenHandler((details) => {
+      const type = contents.getType();
+      // Super Player (webview tag OR BrowserView): allow auth / cookie / payment windows
+      const isStreamingGuest =
+        type === 'webview' ||
+        type === 'browserView' ||
+        (contents.session &&
+          typeof contents.session.getStoragePath === 'function' &&
+          String(contents.session.getStoragePath() || '').includes('meuplayer-streaming'));
+
+      // Also allow when partition name is known via user agent / URL
+      let isStreamPartition = false;
+      try {
+        // Electron sets partition on session
+        isStreamPartition =
+          contents.session === session.fromPartition(STREAM_PARTITION);
+      } catch {
+        isStreamPartition = false;
+      }
+
+      if (isStreamingGuest || isStreamPartition) {
+        console.log(`[popup:allow-stream] ${details.url}`);
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 560,
+            height: 780,
+            minWidth: 400,
+            minHeight: 500,
+            autoHideMenuBar: true,
+            backgroundColor: '#0b0b12',
+            webPreferences: {
+              partition: STREAM_PARTITION,
+              nodeIntegration: false,
+              contextIsolation: true,
+              sandbox: true,
+            },
+          },
+        };
+      }
+
+      // Main shell (TV channels etc.): block popup spam/ads — open external instead if http(s)
+      const url = String(details.url || '');
+      if (/^https?:\/\//i.test(url) && mainWindow) {
+        const mainUrl = mainWindow.webContents.getURL();
+        if (mainUrl.includes('/player')) {
+          shell.openExternal(url).catch(() => {});
+        }
+      }
       console.log(`[popup:block] ${details.url}`);
       return { action: 'deny' };
-    });
-
-    contents.on('did-create-window', (window, details) => {
-      console.log(`[popup:close] ${details.url}`);
-      window.close();
     });
   });
 }
@@ -306,15 +539,14 @@ function migrateDotEnvToSettings() {
 }
 
 app.whenReady().then(() => {
-  blockPopupWindows();
   migrateDotEnvToSettings();
 
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const headers = { ...details.responseHeaders };
-    delete headers['x-frame-options'];
-    delete headers['X-Frame-Options'];
-    callback({ responseHeaders: headers });
-  });
+  // Default session (main app + temporary guests)
+  stripFrameBlockingHeaders(session.defaultSession);
+  // Super Player persistent session (cookies/login survive restarts)
+  stripFrameBlockingHeaders(session.fromPartition(STREAM_PARTITION));
+  configureWebContentsPolicy();
+  registerStreamIpc();
 
   if (!startServer()) {
     console.error('Servidor local não pôde ser iniciado');

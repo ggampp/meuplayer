@@ -24,11 +24,13 @@
   }
 
   body.player-open .modal {
-    height: 100vh;
+    height: calc(100vh - var(--app-nav-offset, 56px));
+    height: calc(100dvh - var(--app-nav-offset, 56px));
   }
 
   .modal {
-    height: calc(100vh - 52px);
+    height: calc(100vh - var(--app-nav-offset, 56px));
+    height: calc(100dvh - var(--app-nav-offset, 56px));
   }
 
   .modal__content {

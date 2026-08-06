@@ -1,43 +1,61 @@
+/**
+ * MeuPlayer — Platform Hub navigation
+ * Primary rail: native platforms (MeuPlayer, TV) + external streamings
+ * Secondary row: contextual sub-nav (catalog or TV sections)
+ */
 (function () {
-  function injectIcons() {
-    if (document.querySelector('link[rel="icon"][href="/favicon.ico"]')) return;
-    const specs = [
-      { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
-      { rel: 'icon', href: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
-      { rel: 'icon', href: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
-      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
-      { rel: 'manifest', href: '/site.webmanifest' },
-    ];
-    specs.forEach(({ rel, href, type, sizes }) => {
-      const link = document.createElement('link');
-      link.rel = rel;
-      link.href = href;
-      if (type) link.type = type;
-      if (sizes) link.sizes = sizes;
-      document.head.appendChild(link);
+  'use strict';
+
+  // Purge legacy SW shell caches that used to pin old flat nav (Filmes/Séries/TV…)
+  if (typeof caches !== 'undefined') {
+    caches.keys().then((keys) => {
+      keys
+        .filter((k) => k.startsWith('meuplayer-shell-') && k !== 'meuplayer-shell-v3-hub')
+        .forEach((k) => caches.delete(k));
     });
-    if (!document.querySelector('meta[name="theme-color"]')) {
-      const meta = document.createElement('meta');
-      meta.name = 'theme-color';
-      meta.content = '#0d0d1a';
-      document.head.appendChild(meta);
-    }
   }
 
-  injectIcons();
+  // ── Config ─────────────────────────────────────────────────────────
+  const NATIVE_PLATFORMS = [
+    {
+      id: 'meuplayer',
+      name: 'MeuPlayer',
+      path: '/',
+      title: 'Catálogo MeuPlayer — filmes, séries, animes e doramas',
+      icon: 'film',
+    },
+    {
+      id: 'tv',
+      name: 'TV',
+      path: '/rede-buzz',
+      title: 'TV ao vivo',
+      icon: 'tv',
+      live: true,
+    },
+  ];
 
-  const LINKS = [
+  const CATALOG_LINKS = [
+    { label: 'Início', path: '/' },
     { label: 'Filmes', path: '/filme' },
     { label: 'Séries', path: '/serie' },
     { label: 'Animes', path: '/anime' },
     { label: 'Doramas', path: '/dorama' },
-    { label: 'TV', path: '/rede-buzz' },
-    { label: 'TV Favoritos', path: '/rede-buzz-favoritos' },
-    { label: 'Downloads', path: '/downloads' },
-    { label: 'Configurações', path: '/configuracoes' },
+    { label: 'Fileiras', path: '/netflix' },
+  ];
+
+  const TV_LINKS = [
+    { label: 'Canais', path: '/rede-buzz' },
+    { label: 'Favoritos', path: '/rede-buzz-favoritos' },
+  ];
+
+  const UTILITY_LINKS = [
+    { label: 'Downloads', path: '/downloads', icon: 'download' },
+    { label: 'Config', path: '/configuracoes', icon: 'settings' },
   ];
 
   const CATALOG_LIST_PATHS = new Set(['/', '/filme', '/serie', '/anime', '/dorama', '/netflix']);
+  const CATALOG_PREFIXES = ['/filme', '/serie', '/anime', '/dorama', '/netflix'];
+  const TV_PREFIXES = ['/rede-buzz', '/canais'];
 
   const DEFAULT_PROVIDERS = [
     {
@@ -66,313 +84,415 @@
     },
   ];
 
-  const style = document.createElement('style');
-  style.textContent = `
-    .app-nav {
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: var(--space-2xs) var(--space-xs);
-      padding: var(--space-2xs) var(--space-md);
-      min-height: 52px;
-      background: oklch(16% 0.02 250 / 0.92);
-      border-bottom: 1px solid var(--color-rule);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      flex-shrink: 0;
-      font-family: var(--font-body);
-    }
-    .app-nav__logo {
-      font-family: var(--font-display);
-      font-style: italic;
-      font-weight: 600;
-      font-size: 1.25rem;
-      letter-spacing: -0.02em;
-      color: var(--color-ink);
-      text-decoration: none;
-      margin-right: var(--space-xs);
-      padding: var(--space-3xs) var(--space-2xs);
-    }
-    .app-nav__logo:hover {
-      color: var(--color-accent);
-    }
+  const ICONS = {
+    film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>',
+    tv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  };
 
-    .app-nav__providers {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      overflow-x: auto;
-      padding: 2px 0;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      margin-right: auto;
-    }
-    .app-nav__providers::-webkit-scrollbar {
-      display: none;
-    }
-    .app-nav__provider-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.65rem;
-      height: 30px;
-      border-radius: 999px;
-      background: oklch(22% 0.02 250);
-      border: 1px solid var(--color-rule);
-      color: var(--color-ink-2);
-      text-decoration: none;
-      font-size: 0.78rem;
-      font-weight: 500;
-      white-space: nowrap;
-      transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .app-nav__provider-chip:hover {
-      background: oklch(28% 0.02 250);
-      border-color: var(--color-accent);
-      color: var(--color-ink);
-      transform: translateY(-1px);
-    }
-    .app-nav__provider-chip--active {
-      background: var(--color-accent);
-      color: var(--color-accent-ink);
-      border-color: var(--color-accent);
-      font-weight: 700;
-    }
-    .app-nav__provider-chip img {
-      height: 16px;
-      width: auto;
-      max-width: 45px;
-      object-fit: contain;
-      border-radius: 2px;
-    }
-    .app-nav__add-provider-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.25rem 0.65rem;
-      height: 30px;
-      border-radius: 999px;
-      background: transparent;
-      border: 1px dashed var(--color-accent);
-      color: var(--color-accent);
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .app-nav__add-provider-btn:hover {
-      background: var(--color-accent-soft);
-      transform: translateY(-1px);
-    }
-
-    .app-nav__link {
-      font-family: var(--font-body);
-      font-size: 0.82rem;
-      letter-spacing: 0.02em;
-      color: var(--color-ink-2);
-      text-decoration: none;
-      padding: 0.35rem 0.75rem;
-      border-radius: 999px;
-      transition: color var(--dur-short, 220ms) cubic-bezier(0.16, 1, 0.3, 1),
-        background-color var(--dur-short, 220ms) cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .app-nav__link:hover {
-      color: var(--color-ink);
-      background: oklch(28% 0.015 250 / 0.6);
-    }
-    .app-nav__link--active {
-      color: var(--color-accent-ink);
-      background: var(--color-accent);
-    }
-    .app-nav__link:focus-visible {
-      outline: 2px solid var(--color-focus);
-      outline-offset: 2px;
-    }
-    .app-nav__filters {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      flex: 0 0 auto;
-      justify-content: flex-start;
-      margin-left: 0;
-      min-width: 0;
-    }
-    .app-nav__filters:empty {
-      display: none;
-    }
-    .app-nav__mobile-select {
-      display: none;
-      font-family: var(--font-body);
-      font-size: 0.85rem;
-      color: var(--color-ink);
-      background: var(--color-paper-2);
-      border: 1px solid var(--color-rule);
-      border-radius: 999px;
-      padding: 0.35rem 0.75rem;
-      cursor: pointer;
-      min-width: 8rem;
-    }
-    @media (max-width: 768px) {
-      .app-nav__link {
-        display: none;
-      }
-      .app-nav__mobile-select {
-        display: block;
-      }
-      .app-nav {
-        padding: var(--space-2xs) var(--space-sm) var(--space-xs);
-      }
-      .app-nav__filters {
-        flex: 1 1 100%;
-        order: 10;
-        margin-left: 0;
-        margin-right: 0;
-        justify-content: stretch;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-
-  const currentPath = window.location.pathname;
+  // ── Route helpers ──────────────────────────────────────────────────
+  const currentPath = normalizePath(window.location.pathname);
   const currentParams = new URLSearchParams(window.location.search);
   const activePlayerUrl = currentParams.get('url') || '';
+  const activeProviderId = currentParams.get('providerId') || '';
+
+  function normalizePath(path) {
+    return (path || '/').replace(/\/$/, '') || '/';
+  }
 
   function isCatalogListPage() {
-    const path = currentPath.replace(/\/$/, '') || '/';
-    return CATALOG_LIST_PATHS.has(path);
+    return CATALOG_LIST_PATHS.has(currentPath);
   }
 
-  function isActive(linkPath) {
-    if (linkPath === '/') return currentPath === '/';
-    return currentPath === linkPath || currentPath.startsWith(linkPath + '/');
+  function isMeuPlayerActive() {
+    if (currentPath === '/') return true;
+    return CATALOG_PREFIXES.some((p) => currentPath === p || currentPath.startsWith(p + '/'));
   }
 
-  const nav = document.createElement('nav');
-  nav.className = 'app-nav';
-  nav.setAttribute('aria-label', 'Navegação principal');
+  function isTvActive() {
+    return TV_PREFIXES.some((p) => currentPath === p || currentPath.startsWith(p + '/'));
+  }
 
-  const logo = document.createElement('a');
-  logo.className = 'app-nav__logo';
-  logo.href = '/';
-  logo.textContent = 'MeuPlayer';
-  nav.appendChild(logo);
+  function isExternalPlayerActive() {
+    return currentPath === '/player';
+  }
 
-  // Container para chips dos Provedores (Super Player)
-  const providersContainer = document.createElement('div');
-  providersContainer.className = 'app-nav__providers';
-  providersContainer.setAttribute('aria-label', 'Plataformas de Vídeo');
-  nav.appendChild(providersContainer);
+  function isLinkActive(linkPath) {
+    const normalized = normalizePath(linkPath);
+    if (normalized === '/') return currentPath === '/';
+    return currentPath === normalized || currentPath.startsWith(normalized + '/');
+  }
 
-  async function renderProviders() {
-    let providers = DEFAULT_PROVIDERS;
-    try {
-      const res = await fetch('/api/providers');
-      if (res.ok) {
-        providers = await res.json();
+  function isNativeActive(platform) {
+    if (platform.id === 'meuplayer') return isMeuPlayerActive();
+    if (platform.id === 'tv') return isTvActive();
+    return false;
+  }
+
+  function isExternalProviderActive(provider) {
+    if (!isExternalPlayerActive()) return false;
+    if (activeProviderId && provider.id && activeProviderId === provider.id) return true;
+    if (!activePlayerUrl || !provider.url) return false;
+    return (
+      activePlayerUrl === provider.url ||
+      activePlayerUrl.includes(provider.url) ||
+      provider.url.includes(activePlayerUrl)
+    );
+  }
+
+  function playerHref(provider) {
+    const q = new URLSearchParams();
+    q.set('url', provider.url || '');
+    q.set('name', provider.name || '');
+    if (provider.icon) q.set('icon', provider.icon);
+    if (provider.id) q.set('providerId', provider.id);
+    return '/player?' + q.toString();
+  }
+
+  // ── DOM helpers ────────────────────────────────────────────────────
+  function el(tag, props, ...children) {
+    const node = document.createElement(tag);
+    if (props) {
+      Object.keys(props).forEach((key) => {
+        const val = props[key];
+        if (val == null || val === false) return;
+        if (key === 'className') node.className = val;
+        else if (key === 'dataset') Object.assign(node.dataset, val);
+        else if (key === 'html') node.innerHTML = val;
+        else if (key.startsWith('on') && typeof val === 'function') {
+          node.addEventListener(key.slice(2).toLowerCase(), val);
+        } else if (key === 'attrs') {
+          Object.keys(val).forEach((a) => node.setAttribute(a, val[a]));
+        } else {
+          node.setAttribute(key, val === true ? '' : String(val));
+        }
+      });
+    }
+    children.flat().forEach((child) => {
+      if (child == null || child === false) return;
+      if (typeof child === 'string') node.appendChild(document.createTextNode(child));
+      else node.appendChild(child);
+    });
+    return node;
+  }
+
+  function injectIcons() {
+    if (document.querySelector('link[rel="icon"][href="/favicon.ico"]')) return;
+    const specs = [
+      { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+      { rel: 'icon', href: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { rel: 'icon', href: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
+      { rel: 'manifest', href: '/site.webmanifest' },
+    ];
+    specs.forEach(({ rel, href, type, sizes }) => {
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = href;
+      if (type) link.type = type;
+      if (sizes) link.sizes = sizes;
+      document.head.appendChild(link);
+    });
+    if (!document.querySelector('meta[name="theme-color"]')) {
+      const meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      meta.content = '#0d0d1a';
+      document.head.appendChild(meta);
+    }
+  }
+
+  function ensureHubStylesheet() {
+    if (document.querySelector('link[href="/css/hub.css"]')) return;
+    // Prefer styles.css import chain; fallback inject if styles not loaded yet
+    if (document.querySelector('link[href="/styles.css"], link[href*="styles.css"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/css/hub.css';
+    document.head.appendChild(link);
+  }
+
+  function openProviderModal() {
+    if (window.MeuPlayerProviderModal) {
+      window.MeuPlayerProviderModal.open();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = '/provider-modal.js';
+    script.onload = () => {
+      if (window.MeuPlayerProviderModal) window.MeuPlayerProviderModal.open();
+    };
+    document.body.appendChild(script);
+  }
+
+  // ── Build chips ────────────────────────────────────────────────────
+  function buildNativeChip(platform) {
+    const active = isNativeActive(platform);
+    const classes = [
+      'app-nav__chip',
+      'app-nav__chip--native',
+      active ? 'app-nav__chip--active' : '',
+      platform.live && active ? 'app-nav__chip--live' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const chip = el('a', {
+      className: classes,
+      href: platform.path,
+      title: platform.title,
+      'aria-current': active ? 'page' : null,
+    });
+
+    if (platform.icon && ICONS[platform.icon]) {
+      chip.appendChild(
+        el('span', { className: 'app-nav__chip-icon', html: ICONS[platform.icon] })
+      );
+    }
+    chip.appendChild(document.createTextNode(platform.name));
+    return chip;
+  }
+
+  function buildExternalChip(provider) {
+    const active = isExternalProviderActive(provider);
+    const chip = el('a', {
+      className: 'app-nav__chip' + (active ? ' app-nav__chip--active' : ''),
+      href: playerHref(provider),
+      title: 'Abrir ' + provider.name,
+      'aria-current': active ? 'page' : null,
+    });
+
+    if (provider.icon) {
+      const img = el('img', {
+        src: provider.icon,
+        alt: '',
+      });
+      img.onerror = () => {
+        img.src = '/img/providers/default-provider.svg';
+      };
+      chip.appendChild(img);
+    }
+    chip.appendChild(el('span', null, provider.name));
+    return chip;
+  }
+
+  function buildAddButton() {
+    return el(
+      'button',
+      {
+        type: 'button',
+        className: 'app-nav__add',
+        title: 'Cadastrar nova plataforma de vídeo',
+        onClick: openProviderModal,
+      },
+      el('span', { className: 'app-nav__add-icon', html: '+' }),
+      el('span', null, 'Novo')
+    );
+  }
+
+  function fillSelect(select, options, isSelected) {
+    select.innerHTML = '';
+    options.forEach((opt) => {
+      const option = el('option', { value: opt.value }, opt.label);
+      if (isSelected(opt)) option.selected = true;
+      select.appendChild(option);
+    });
+  }
+
+  // ── Render platforms ───────────────────────────────────────────────
+  function createHub() {
+    injectIcons();
+    ensureHubStylesheet();
+
+    const nav = el('nav', {
+      className: 'app-nav',
+      attrs: { 'aria-label': 'Hub de plataformas' },
+    });
+
+    const primaryRow = el('div', { className: 'app-nav__row app-nav__row--primary' });
+    nav.appendChild(primaryRow);
+
+    primaryRow.appendChild(
+      el(
+        'a',
+        {
+          className: 'app-nav__logo',
+          href: '/',
+          title: 'MeuPlayer — catálogo',
+        },
+        'MeuPlayer'
+      )
+    );
+
+    const platformsContainer = el('div', {
+      className: 'app-nav__platforms',
+      attrs: {
+        'aria-label': 'Plataformas de vídeo',
+        role: 'navigation',
+      },
+    });
+    primaryRow.appendChild(platformsContainer);
+
+    const platformSelect = el('select', {
+      className: 'app-nav__mobile-select',
+      attrs: { 'aria-label': 'Plataforma' },
+      onChange: () => {
+        window.location.href = platformSelect.value;
+      },
+    });
+    primaryRow.appendChild(platformSelect);
+
+    const utilities = el('div', { className: 'app-nav__utilities' });
+    UTILITY_LINKS.forEach(({ label, path, icon }) => {
+      const active = isLinkActive(path);
+      const link = el('a', {
+        className: 'app-nav__util' + (active ? ' app-nav__util--active' : ''),
+        href: path,
+        title: label,
+        'aria-current': active ? 'page' : null,
+      });
+      if (icon && ICONS[icon]) {
+        link.insertAdjacentHTML('beforeend', ICONS[icon]);
       }
-    } catch (e) {
-      console.warn('Usando provedores padrão para navegação:', e);
+      link.appendChild(el('span', { className: 'app-nav__util-label' }, label));
+      utilities.appendChild(link);
+    });
+    primaryRow.appendChild(utilities);
+
+    // Secondary contextual row
+    const showMeuPlayerSub = isMeuPlayerActive();
+    const showTvSub = isTvActive();
+
+    if (showMeuPlayerSub || showTvSub) {
+      const secondaryRow = el('div', { className: 'app-nav__row app-nav__row--secondary' });
+      nav.appendChild(secondaryRow);
+
+      const links = showMeuPlayerSub ? CATALOG_LINKS : TV_LINKS;
+      const subnav = el('div', {
+        className: 'app-nav__subnav',
+        attrs: {
+          'aria-label': showMeuPlayerSub ? 'Seções do catálogo' : 'Seções da TV',
+        },
+      });
+
+      links.forEach(({ label, path }) => {
+        const active = isLinkActive(path);
+        subnav.appendChild(
+          el(
+            'a',
+            {
+              className: 'app-nav__link' + (active ? ' app-nav__link--active' : ''),
+              href: path,
+              'aria-current': active ? 'page' : null,
+            },
+            label
+          )
+        );
+      });
+      secondaryRow.appendChild(subnav);
+
+      const sectionSelect = el('select', {
+        className: 'app-nav__mobile-select',
+        attrs: { 'aria-label': 'Seção' },
+        onChange: () => {
+          window.location.href = sectionSelect.value;
+        },
+      });
+      fillSelect(
+        sectionSelect,
+        links.map((l) => ({ value: l.path, label: l.label })),
+        (opt) => isLinkActive(opt.value)
+      );
+      secondaryRow.appendChild(sectionSelect);
+
+      if (showMeuPlayerSub && isCatalogListPage()) {
+        secondaryRow.appendChild(
+          el('div', {
+            id: 'catalogFilters',
+            className: 'app-nav__filters',
+            attrs: { 'aria-label': 'Filtros do catálogo' },
+          })
+        );
+      }
     }
 
-    providersContainer.innerHTML = '';
+    function renderPlatformsSync(externalProviders) {
+      platformsContainer.innerHTML = '';
 
-    providers.forEach((provider) => {
-      const chip = document.createElement('a');
-      const playerLink = '/player?url=' + encodeURIComponent(provider.url) + '&name=' + encodeURIComponent(provider.name) + '&icon=' + encodeURIComponent(provider.icon);
-      
-      const isCurrentActive = currentPath === '/player' && (activePlayerUrl === provider.url || activePlayerUrl.includes(provider.url));
-      chip.className = 'app-nav__provider-chip' + (isCurrentActive ? ' app-nav__provider-chip--active' : '');
-      chip.href = playerLink;
-      chip.title = `Abrir ${provider.name} no Super Player`;
+      const selectOptions = [];
 
-      const img = document.createElement('img');
-      img.src = provider.icon || '/img/providers/default-provider.svg';
-      img.alt = provider.name;
-      img.onerror = () => { img.src = '/img/providers/default-provider.svg'; };
+      NATIVE_PLATFORMS.forEach((platform) => {
+        platformsContainer.appendChild(buildNativeChip(platform));
+        selectOptions.push({
+          value: platform.path,
+          label: platform.name,
+          selected: isNativeActive(platform),
+        });
+      });
 
-      const span = document.createElement('span');
-      span.textContent = provider.name;
+      platformsContainer.appendChild(el('span', { className: 'app-nav__divider', attrs: { 'aria-hidden': 'true' } }));
 
-      chip.appendChild(img);
-      chip.appendChild(span);
-      providersContainer.appendChild(chip);
-    });
+      (externalProviders || []).forEach((provider) => {
+        platformsContainer.appendChild(buildExternalChip(provider));
+        selectOptions.push({
+          value: playerHref(provider),
+          label: provider.name,
+          selected: isExternalProviderActive(provider),
+        });
+      });
 
-    // Botão "+ Novo Provedor"
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'app-nav__add-provider-btn';
-    addBtn.innerHTML = '<span>+ Novo Provedor</span>';
-    addBtn.title = 'Cadastrar nova plataforma de vídeo';
+      platformsContainer.appendChild(buildAddButton());
 
-    addBtn.addEventListener('click', () => {
-      if (window.MeuPlayerProviderModal) {
-        window.MeuPlayerProviderModal.open();
-      } else {
-        const script = document.createElement('script');
-        script.src = '/provider-modal.js';
-        script.onload = () => {
-          if (window.MeuPlayerProviderModal) {
-            window.MeuPlayerProviderModal.open();
+      fillSelect(platformSelect, selectOptions, (opt) => opt.selected);
+    }
+
+    async function loadPlatforms() {
+      try {
+        const res = await fetch('/api/providers');
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            renderPlatformsSync(list);
+            publishNavOffset();
+            return;
           }
-        };
-        document.body.appendChild(script);
+        }
+      } catch (e) {
+        console.warn('Usando plataformas padrão para navegação:', e);
       }
-    });
+      renderPlatformsSync(DEFAULT_PROVIDERS);
+      publishNavOffset();
+    }
 
-    providersContainer.appendChild(addBtn);
+    function publishNavOffset() {
+      const h = Math.ceil(nav.getBoundingClientRect().height) || 56;
+      document.documentElement.style.setProperty('--app-nav-offset', h + 'px');
+    }
+
+    // Initial paint + API refresh
+    renderPlatformsSync(DEFAULT_PROVIDERS);
+    loadPlatforms();
+    window.addEventListener('meuplayer:providers-changed', loadPlatforms);
+
+    function inject() {
+      document.body.insertBefore(nav, document.body.firstChild);
+      publishNavOffset();
+      window.addEventListener('resize', publishNavOffset);
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(publishNavOffset);
+        ro.observe(nav);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', inject);
+    } else {
+      inject();
+    }
   }
 
-  renderProviders();
-  window.addEventListener('meuplayer:providers-changed', renderProviders);
-
-  const mobileNav = document.createElement('select');
-  mobileNav.className = 'app-nav__mobile-select';
-  mobileNav.setAttribute('aria-label', 'Navegação');
-  LINKS.forEach(({ label, path: linkPath }) => {
-    const opt = document.createElement('option');
-    opt.value = linkPath;
-    opt.textContent = label;
-    if (isActive(linkPath)) opt.selected = true;
-    mobileNav.appendChild(opt);
-  });
-  mobileNav.addEventListener('change', () => {
-    window.location.href = mobileNav.value;
-  });
-  nav.appendChild(mobileNav);
-
-  if (isCatalogListPage()) {
-    const filtersSlot = document.createElement('div');
-    filtersSlot.id = 'catalogFilters';
-    filtersSlot.className = 'app-nav__filters';
-    filtersSlot.setAttribute('aria-label', 'Filtros do catálogo');
-    nav.appendChild(filtersSlot);
-  }
-
-  LINKS.forEach(({ label, path: linkPath }) => {
-    const a = document.createElement('a');
-    a.className = 'app-nav__link' + (isActive(linkPath) ? ' app-nav__link--active' : '');
-    a.href = linkPath;
-    a.textContent = label;
-    nav.appendChild(a);
-  });
-
-  function inject() {
-    document.body.insertBefore(nav, document.body.firstChild);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', inject);
-  } else {
-    inject();
-  }
-
-  // ── Remote receiver ───────────────────────────────────────────────
-  (function () {
+  // ── Remote receiver (SSE) ──────────────────────────────────────────
+  function initRemoteReceiver() {
     const SESSION_KEY = 'meuplayer_remote_session';
     let evtSource = null;
 
@@ -393,36 +513,39 @@
         }
       } else if (action.startsWith('key_')) {
         const keyMap = {
-          'key_up': 'ArrowUp',
-          'key_down': 'ArrowDown',
-          'key_left': 'ArrowLeft',
-          'key_right': 'ArrowRight',
-          'key_ok': 'Enter',
-          'key_back': 'Escape'
+          key_up: 'ArrowUp',
+          key_down: 'ArrowDown',
+          key_left: 'ArrowLeft',
+          key_right: 'ArrowRight',
+          key_ok: 'Enter',
+          key_back: 'Escape',
         };
         const mappedKey = keyMap[action];
         if (mappedKey) {
-          const event = new KeyboardEvent('keydown', {
-            key: mappedKey,
-            bubbles: true,
-            cancelable: true
-          });
-          window.dispatchEvent(event);
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', { key: mappedKey, bubbles: true, cancelable: true })
+          );
         }
       }
     }
 
     function connect(token) {
-      if (evtSource) { evtSource.close(); evtSource = null; }
-      const url = '/api/remote/events?session=' + encodeURIComponent(token);
-      evtSource = new EventSource(url);
+      if (evtSource) {
+        evtSource.close();
+        evtSource = null;
+      }
+      evtSource = new EventSource('/api/remote/events?session=' + encodeURIComponent(token));
       evtSource.onmessage = function (event) {
-        try { handleCommand(JSON.parse(event.data)); } catch (e) {}
+        try {
+          handleCommand(JSON.parse(event.data));
+        } catch (_) {}
       };
       evtSource.onerror = function () {
         evtSource.close();
         evtSource = null;
-        setTimeout(function () { connect(token); }, 5000);
+        setTimeout(function () {
+          connect(token);
+        }, 5000);
       };
     }
 
@@ -436,5 +559,8 @@
         connect(token);
       }
     });
-  })();
+  }
+
+  createHub();
+  initRemoteReceiver();
 })();

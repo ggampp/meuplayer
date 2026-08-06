@@ -186,7 +186,7 @@
     backdropEl.innerHTML = `
       <div class="mp-modal">
         <div class="mp-modal__header">
-          <h3 class="mp-modal__title">Cadastrar Novo Provedor</h3>
+          <h3 class="mp-modal__title">Nova plataforma</h3>
           <button class="mp-modal__close" aria-label="Fechar">&times;</button>
         </div>
         <form id="mpProviderForm">
@@ -222,11 +222,11 @@
           </div>
           <div class="mp-modal__preview">
             <img id="mpPreviewImg" class="mp-modal__preview-img" src="/img/providers/default-provider.svg" alt="Preview" />
-            <span id="mpPreviewText" class="mp-modal__preview-text">Pré-visualização do logo do provedor</span>
+            <span id="mpPreviewText" class="mp-modal__preview-text">Pré-visualização do logo</span>
           </div>
           <div class="mp-modal__footer">
             <button type="button" class="mp-btn mp-btn--secondary mp-modal__cancel">Cancelar</button>
-            <button type="submit" class="mp-btn mp-btn--primary">Salvar Provedor</button>
+            <button type="submit" class="mp-btn mp-btn--primary">Salvar plataforma</button>
           </div>
         </form>
       </div>
@@ -278,8 +278,12 @@
           const provider = await res.json();
           window.dispatchEvent(new CustomEvent('meuplayer:providers-changed', { detail: { provider } }));
           close();
-          // Navega para o player com o novo provedor
-          window.location.href = '/player?url=' + encodeURIComponent(provider.url) + '&name=' + encodeURIComponent(provider.name);
+          const q = new URLSearchParams();
+          q.set('url', provider.url || '');
+          q.set('name', provider.name || '');
+          if (provider.icon) q.set('icon', provider.icon);
+          if (provider.id) q.set('providerId', provider.id);
+          window.location.href = '/player?' + q.toString();
         } else {
           alert('Erro ao salvar provedor.');
         }

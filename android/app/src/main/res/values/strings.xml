@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MeuPlayer</string>
+    <string name="prompt_server_url">Digite a URL do servidor MeuPlayer (PC na rede ou VPS):</string>
+    <string name="change_server_url">Alterar URL do servidor:</string>
+    <string name="error_connect">Não foi possível conectar. Verifique a URL do servidor:</string>
+    <string name="server_url_help">Ex.: http://192.168.0.10:3000 ou https://meuplayer.seudominio.com\nMENU ou BACK longo reabre esta tela.</string>
+    <string name="connect">Conectar</string>
+    <string name="clear_cache">Limpar cache</string>
+    <string name="cache_cleared">Cache limpo</string>
+    <string name="invalid_url">URL inválida</string>
 </resources>

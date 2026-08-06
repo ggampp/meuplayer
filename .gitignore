@@ -25,6 +25,8 @@ env/
 node_modules/
 out/
 dist/
+# Vite sourcemaps (js bundles in public/js are committed or rebuilt in CI/Docker)
+public/js/**/*.map
 
 # Project cache
 public/cache/

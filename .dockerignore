@@ -6,8 +6,10 @@ out/
 dist/
 dist-server/
 public/cache/
+public/js/**/*.map
 android/
 .hallmark/
 *.md
 .env
 .envrc
+# Keep src/, package*.json, vite.config.ts, tsconfig.json for frontend stage

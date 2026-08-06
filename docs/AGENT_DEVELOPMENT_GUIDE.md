@@ -31,7 +31,7 @@ Tarefa ativa: copiar trecho relevante para `docs/sprints/XXX-current.md` e apaga
 |--------|-------------------|--------|
 | Desktop | `main.js` | Electron, porta 8765 |
 | Servidor | `cmd/server/main.go`, `internal/cache`, `internal/server`, `internal/handlers` | Go, cache SQLite/Postgres |
-| Frontend VOD | `public/app.jsx` → `public/app.js` | React 18 CDN + Babel |
+| Frontend VOD | `src/app/main.tsx` → `public/js/app.js` | React 18 + Vite + TypeScript |
 | TV / utilitários | `public/rede-buzz-ui.js`, `public/canais.html` | Workbench |
 | Estilos | `public/styles.css` → `@import public/css/*` | Design system em `design.md` |
 | Downloads | `public/downloads/` | **Versionado de propósito** — uso sem clonar repo |
@@ -40,8 +40,8 @@ Tarefa ativa: copiar trecho relevante para `docs/sprints/XXX-current.md` e apaga
 
 ## Arquivos que agentes devem evitar ler por completo
 
-- `public/app.jsx` (modularização Fase 4 pendente) — usar `grep` por componente
-- `public/app.js` (gerado; editar só `app.jsx`)
+- `src/app/main.tsx` (catálogo React) — usar `grep` por componente; não editar `public/js/*`
+- `public/js/*` (gerado pelo Vite; editar só `src/`)
 - `public/css/*.css` — ler o partial da feature
 - `internal/handlers/tmdb.go` — buscar handler específico
 
