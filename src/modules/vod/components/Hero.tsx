@@ -13,13 +13,8 @@ export function Hero({ featured, onWatch }: HeroProps) {
       <section className="hero" aria-label="Destaque">
         <div className="hero__bloom" aria-hidden="true" />
         <p className="hero__eyebrow">MeuPlayer</p>
-        <h1 className="hero__title">
-          Um cinema <em>pessoal</em>, sem alarde.
-        </h1>
-        <p className="hero__subtitle">
-          Filmes, séries e animes do TMDB tocados via SuperFlix — sem
-          recomendações forçadas, sem perfis, sem anúncios.
-        </p>
+        <h2 className="hero__title">Reserve um tempo para uma boa história.</h2>
+        <p className="hero__subtitle">Explore filmes, séries, animes e doramas. Use a pesquisa para encontrar seu próximo título.</p>
       </section>
     );
   }

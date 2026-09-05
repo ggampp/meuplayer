@@ -1,3 +1,14 @@
+# Atualização aprovada — MeuPlayer Web (2026-09-05)
+
+A experiência principal é web, com entrada `/`, módulo `/vod` e módulo `/tv`.
+O layout aprovado substitui a tipografia serifada por Segoe UI Variable/Segoe UI,
+preserva a paleta azul profundo/âmbar e usa espaços de 8 px, cantos de 12–20 px,
+foco visível e transições de 160–220 ms com movimento reduzido.
+A navegação principal apresenta os dois módulos; plataformas externas continuam
+acessíveis pelo player/configurações. A TV mantém lista e player independentes.
+Tokens em `public/tokens.css`; composição nova em `public/css/modules.css`.
+Esta seção prevalece sobre as descrições históricas de layout abaixo.
+
 # Design — MeuPlayer
 
 A locked design system for this Electron app. Every page redesign reads this

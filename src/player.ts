@@ -1,3 +1,4 @@
+export {};
 /**
  * Super Player host
  * - Electron + preload bridge → BrowserView (correct full-area streaming)

@@ -25,15 +25,15 @@ export interface NativePlatform {
 export const NATIVE_PLATFORMS: NativePlatform[] = [
   {
     id: "meuplayer",
-    name: "MeuPlayer",
-    path: "/",
+    name: "VOD",
+    path: "/vod",
     title: "Catálogo MeuPlayer — filmes, séries, animes e doramas",
     icon: "film",
   },
   {
     id: "tv",
     name: "TV",
-    path: "/rede-buzz",
+    path: "/tv",
     title: "TV ao vivo",
     icon: "tv",
     live: true,
@@ -41,7 +41,7 @@ export const NATIVE_PLATFORMS: NativePlatform[] = [
 ];
 
 export const CATALOG_LINKS: NavLink[] = [
-  { label: "Início", path: "/" },
+  { label: "Explorar", path: "/vod" },
   { label: "Filmes", path: "/filme" },
   { label: "Séries", path: "/serie" },
   { label: "Animes", path: "/anime" },
@@ -50,8 +50,8 @@ export const CATALOG_LINKS: NavLink[] = [
 ];
 
 export const TV_LINKS: NavLink[] = [
-  { label: "Canais", path: "/rede-buzz" },
-  { label: "Favoritos", path: "/rede-buzz-favoritos" },
+  { label: "Canais", path: "/tv" },
+  { label: "Favoritos", path: "/tv/favoritos" },
 ];
 
 export const UTILITY_LINKS: NavLink[] = [
@@ -60,7 +60,7 @@ export const UTILITY_LINKS: NavLink[] = [
 ];
 
 export const CATALOG_LIST_PATHS = new Set([
-  "/",
+  "/vod",
   "/filme",
   "/serie",
   "/anime",
@@ -69,13 +69,14 @@ export const CATALOG_LIST_PATHS = new Set([
 ]);
 
 export const CATALOG_PREFIXES = [
+  "/vod",
   "/filme",
   "/serie",
   "/anime",
   "/dorama",
   "/netflix",
 ];
-export const TV_PREFIXES = ["/rede-buzz", "/canais"];
+export const TV_PREFIXES = ["/tv", "/rede-buzz", "/rede-buzz-favoritos", "/canais"];
 
 export const DEFAULT_PROVIDERS: StreamingProvider[] = [
   {
@@ -104,7 +105,7 @@ export const DEFAULT_PROVIDERS: StreamingProvider[] = [
   },
 ];
 
-export const HUB_CACHE_NAME = "meuplayer-shell-v3-hub";
+export const HUB_CACHE_NAME = "meuplayer-shell-v4-modules";
 
 export const ICONS: Record<string, string> = {
   film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>',

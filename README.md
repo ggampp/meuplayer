@@ -1,163 +1,88 @@
-# MeuPlayer
+# MeuPlayer Web
 
-MeuPlayer é um aplicativo desktop e TV Box de catálogo e player multimídia: **Electron** + **servidor Go** local (cache em banco) + frontend **React 18** (CDN/Babel). O app abre uma janela desktop, sobe HTTP na porta `8765` e entrega as telas de `public/`.
+Serviço web de VOD e TV ao vivo, com frontend React 18 + TypeScript + Vite e servidor Go. A página inicial permite escolher uma experiência independente.
 
-## Recursos
+| Rota | Experiência |
+|---|---|
+| `/` | Escolha entre VOD e TV |
+| `/vod` | Filmes, séries, animes e doramas |
+| `/tv` | Canais ao vivo, pesquisa e favoritos |
+| `/tv/favoritos` | TV com filtro inicial de favoritos |
+| `/configuracoes` | Configuração do serviço |
 
-- **Catálogo:** Filmes, séries, animes e doramas (SuperFlix + metadados TMDB).
-- **Layout Netflix:** Rota `/netflix` com fileiras horizontais.
-- **Cache:** SQLite (padrão) ou PostgreSQL (`CACHE_DATABASE_URL`).
-- **Elenco e filmografia:** Detalhe de título e página de ator.
-- **Hub de plataformas:** barra no topo com MeuPlayer, TV e streamings (Max, Netflix, etc.); sub-nav de catálogo só no MeuPlayer.
-- **Player imersivo:** Tela cheia, controles com auto-hide, botão flutuante para detalhes.
-- **Controle remoto (SSE):** QR em Configurações → `/remote.html`.
-- **TV ao vivo:** plataforma nativa no hub; `canais.json`, Rede Buzz, favoritos; menu flutuante com auto-hide.
-- **Filtro adulto:** Bloqueio em TMDB e Rede Buzz.
-- **Downloads no site:** `/downloads` com executáveis hospedados em `public/downloads/` (versionados para uso sem clonar o repo).
+Links antigos de filmes, séries, animes, doramas, Rede Buzz e favoritos continuam funcionando. `/canais` mantém a fonte alternativa existente.
 
-## Stack
+## Executar como serviço web
 
-| Camada | Tecnologia |
-|--------|------------|
-| Desktop | Electron 35 |
-| Servidor | Go (`cmd/server`, `internal/*`) |
-| Frontend | **TypeScript + React 18 + Vite** (`src/` → `public/js/`) |
-| Cache | SQLite / PostgreSQL |
-| Deploy | Docker Compose (build multi-stage Node+Go) |
-| TV Box | **Kotlin** WebView leanback (`/android`) |
-
-## Como rodar (desenvolvimento)
+Requisitos: Node.js 20+ e Go compatível com `go.mod`.
 
 ```powershell
 npm install
-npm run build:frontend   # Vite: src/** → public/js/**
-npm start                # build:frontend + Electron (sobe Go em dev)
+npm start
 ```
 
-Scripts úteis:
+`npm start` compila o frontend e inicia o servidor Go. A porta padrão é 8765; pode ser alterada com `PORT`.
 
 ```powershell
-npm run build:frontend   # TypeScript/React → public/js
-npm run typecheck        # tsc --noEmit
-npm run dev:web          # Vite dev server (proxy /api → :8765)
+$env:PORT="3000"
+npm start
 ```
 
-Em dev o Electron sobe o servidor com `go run ./cmd/server` na porta `8765`.
-
-Requisitos: **Node.js 20+**, **Go 1.22+**.
+Configure `TMDB_API_KEY` no `.env` local ou na configuração do servidor. Não versione credenciais. O catálogo e a reprodução dependem das respectivas fontes externas.
 
 ### Docker
 
 ```powershell
 docker compose up -d --build
-# app em http://localhost:3000
 ```
 
-### Android TV
+Acesso em `http://localhost:3000`. O volume `/data` persiste o cache/configurações; SQLite é o padrão, PostgreSQL é opcional via `CACHE_DATABASE_URL`. O serviço não depende de Electron.
 
-Pasta `android/` — shell Kotlin + WebView fullscreen (DPAD, MENU para URL do servidor).
+## Pesquisa
 
-1. Suba o MeuPlayer na rede (`npm start` ou Docker na porta 3000).
-2. Android Studio → abrir `android/` → Run no device/TV.
-3. Na primeira abertura, informe a URL (ex. `http://192.168.0.10:3000`).
-4. **MENU** ou **BACK longo** altera a URL / limpa cache.
+- **VOD:** nome, tipo, gênero, ano, situação, emissora/produtora e nota mínima; ordenação por relevância, popularidade, lançamento, avaliação ou título. Consultas remotas paginadas. Filtros complementares e ordenação refinam os títulos da página carregada; a interface informa essa abrangência.
+- **TV:** nome/identificador, categoria e favoritos combinados, busca sem distinção de acentos e ordem A–Z/Z–A sobre os canais carregados. Alterar a pesquisa não interrompe nem troca o canal em reprodução.
+- Filtros são preservados na URL. Histórico VOD e favoritos TV permanecem no navegador com as mesmas chaves anteriores, sem migração destrutiva.
+
+## Organização
+
+```text
+src/
+  app/                  entrada VOD e seleção dos módulos
+  modules/
+    vod/
+      pages/            coordenação de catálogo e navegação
+      components/       pesquisa, detalhes, player e cartões
+      hooks/            consulta paginada e histórico
+      lib/              API e regras VOD
+      types/            tipos do domínio
+    tv/                 aplicação TV, canais, pesquisa e favoritos
+  shared/lib/           HTTP com cancelamento e normalização de busca
+  nav/                  navegação compartilhada
+internal/
+  handlers/             APIs, validação de filtros e rotas web
+  server/               infraestrutura e configuração
+  cache/                SQLite/PostgreSQL
+public/
+  css/modules.css       layout dos módulos
+  tokens.css            tokens do design
+  js/                   bundles gerados pelo Vite
+```
+
+Edite `src/`, não os bundles em `public/js/`. Os arquivos JS/JSX antigos na raiz de `public/` são legado e não são a fonte dos novos módulos.
+
+## Verificação e clientes opcionais
 
 ```powershell
-# APK debug
-cd android
-# Build via Android Studio: Build → Build APK(s)
+npm run typecheck
+npm run test:search
+npm run build:frontend
+go test ./...
+npm run start:desktop
 ```
 
-## Configurações (TMDB)
+Electron continua como cliente opcional. Android TV continua em `android/`, usando a URL do serviço. Builds desktop usam os scripts `build:win`, `build:linux` e `build:mac`; executáveis de distribuição ficam em `public/downloads/`.
 
-Menu **Configurações** ou `%APPDATA%\meuplayer\settings.json` (Windows).
+A configuração administrativa atual é compartilhada no servidor; a entrega não inclui autenticação ou sincronização de contas. Antes de disponibilizar administração na internet, restringir seu acesso na infraestrutura ou implementar autorização.
 
-`.env` na raiz (desenvolvimento):
-
-```env
-TMDB_API_KEY=sua_chave_tmdb
-# CACHE_DATABASE_URL=postgresql://usuario:senha@localhost:5432/meuplayer
-```
-
-## Scripts
-
-```powershell
-npm start                 # dev Electron
-npm run build:frontend    # app.jsx → app.js
-npm run icons             # favicons e ícones (img/app-de-tv.png)
-npm run build:server      # meuplayer-server.exe + binário Linux
-npm run build:win         # instalador + portable
-npm run build:linux
-npm run build:mac
-```
-
-## Estrutura
-
-| Arquivo / pasta | Função |
-|-----------------|--------|
-| `main.js` | Electron, janela, spawn do servidor Go |
-| `cmd/server/main.go` | Bootstrap HTTP + registro de rotas |
-| `internal/cache/db.go` | Cache SQLite / PostgreSQL |
-| `internal/server/core.go` | Paths, CORS, chave TMDB, `FetchWithCache` |
-| `internal/handlers/*.go` | Handlers HTTP (tmdb, superflix, rede_buzz, remote, settings, static, misc) |
-| `src/` | Frontend TypeScript (fonte da verdade) |
-| `src/app/` | Catálogo React (`App.tsx` + entry `main.tsx`) |
-| `src/components/` | UI reutilizável (MediaCard, Hero, Carousel, …) |
-| `src/lib/` | API, constants, helpers de mídia |
-| `src/nav/` | Hub de plataformas tipado |
-| `public/js/` | Bundle Vite gerado (`npm run build:frontend`) |
-| `public/css/` | Partials de estilo (`hub.css`, `player-shell.css`, …) |
-| `public/styles.css` | Agregador `@import` |
-| `public/*.html` | Shells multi-página (carregam `/js/*.js` como modules) |
-| `android/` | App TV (Kotlin WebView) |
-| `public/netflix.html` | Layout estilo Netflix |
-| `public/rede-buzz*.html` | TV ao vivo |
-| `public/downloads/` | Executáveis para outras máquinas |
-| `design.md` | Design system (locked) |
-| `docs/` | Sprints, guia de agentes, plano de alinhamento |
-
-Árvore do repositório:
-
-```
-meuplayer/
-├── README.md, design.md, SPRINTS.md     # docs de entrada
-├── package.json, go.mod, main.js        # manifests desktop
-├── Dockerfile, docker-compose*.yml      # deploy
-├── cmd/server/main.go                   # bootstrap HTTP + rotas
-├── internal/
-│   ├── cache/db.go                      # SQLite / PostgreSQL
-│   ├── server/core.go                   # paths, CORS, TMDB, FetchWithCache
-│   └── handlers/*.go                    # handlers HTTP
-├── public/                              # UI + downloads (versionados)
-├── docs/                                # planejamento e guias
-├── scripts/                             # build, ícones, python/
-├── img/                                 # assets fonte
-└── android/                             # TV Box
-```
-
-Mapa completo (com regras): [docs/sprints/007-root-layout.md](./docs/sprints/007-root-layout.md).
-
-## Usar em outro computador
-
-1. **Web:** abra a URL do VPS (ex. `https://meuplayer.meusaplicativos.com`).
-2. **Desktop:** `/downloads` no mesmo site — portable ou instalador em `public/downloads/`.
-3. Configure a chave TMDB em cada máquina nova.
-
-## Planejamento e agentes
-
-- [docs/SPRINTS.md](./docs/SPRINTS.md) — índice de sprints
-- [docs/ALIGNMENT_PLAN.md](./docs/ALIGNMENT_PLAN.md) — modularização (Fases 4–6)
-- [docs/sprints/007-root-layout.md](./docs/sprints/007-root-layout.md) — organização da raiz
-- [docs/AGENT_DEVELOPMENT_GUIDE.md](./docs/AGENT_DEVELOPMENT_GUIDE.md)
-
-## Android (TV Box)
-
-Pasta `/android` — WebView fullscreen, DPAD, URL da VPS na primeira execução.
-
-Build: Android Studio → `Build APK` → `android/app/build/outputs/apk/debug/app-debug.apk`.
-
-## Observações
-
-- Players externos podem bloquear embed ou exigir clique manual.
-- `public/downloads/` fica no Git **de propósito** para distribuição direta.
-- `cache.sqlite3`, `.env` e `node_modules` não devem ser commitados.
+Decisões e análise: [docs/WEB_MODULES_PROPOSAL.md](docs/WEB_MODULES_PROPOSAL.md). Identidade visual: [design.md](design.md).

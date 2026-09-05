@@ -194,9 +194,26 @@ func HandleTmdbSearch(w http.ResponseWriter, r *http.Request) {
 	if mediaType != "movie" {
 		tmdbMedia = "tv"
 	}
-	cacheKey := fmt.Sprintf("search:%s:%s:pt-BR", tmdbMedia, strings.ToLower(term))
-	urlStr := fmt.Sprintf("%s/search/%s?api_key=%s&language=pt-BR&query=%s&include_adult=false&page=1",
-		server.TmdbBase, tmdbMedia, server.GetTmdbApiKey(), url.QueryEscape(term))
+	page, err := catalogPage(q.Get("page"))
+	if err != nil {
+		server.SendJSONError(w, http.StatusBadRequest, err.Error(), "")
+		return
+	}
+	year, err := catalogYear(q.Get("year"))
+	if err != nil {
+		server.SendJSONError(w, http.StatusBadRequest, err.Error(), "")
+		return
+	}
+	params := url.Values{"api_key": {server.GetTmdbApiKey()}, "language": {"pt-BR"}, "query": {term}, "include_adult": {"false"}, "page": {strconv.Itoa(page)}}
+	if year != "" {
+		if tmdbMedia == "movie" {
+			params.Set("year", year)
+		} else {
+			params.Set("first_air_date_year", year)
+		}
+	}
+	cacheKey := fmt.Sprintf("search:v2:%s:%s:%d:%s:pt-BR", tmdbMedia, strings.ToLower(term), page, year)
+	urlStr := fmt.Sprintf("%s/search/%s?%s", server.TmdbBase, tmdbMedia, params.Encode())
 	server.FetchWithCache(w, cacheKey, urlStr, server.TtlTmdbSearchSeconds, nil)
 }
 
@@ -208,16 +225,23 @@ func HandleTmdbDiscover(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	mediaType := q.Get("type")
 	genreID := strings.TrimSpace(q.Get("genre"))
-	page := q.Get("page")
-	if page == "" {
-		page = "1"
-	}
-	originalLanguage := strings.ToLower(strings.TrimSpace(q.Get("original_language")))
-
-	if genreID == "" && originalLanguage == "" {
-		server.SendJSONError(w, http.StatusBadRequest, "Informe genre e/ou original_language", "")
+	pageValue, err := catalogPage(q.Get("page"))
+	if err != nil {
+		server.SendJSONError(w, http.StatusBadRequest, err.Error(), "")
 		return
 	}
+	page := strconv.Itoa(pageValue)
+	year, err := catalogYear(q.Get("year"))
+	if err != nil {
+		server.SendJSONError(w, http.StatusBadRequest, err.Error(), "")
+		return
+	}
+	rating, err := catalogRating(q.Get("rating"))
+	if err != nil {
+		server.SendJSONError(w, http.StatusBadRequest, err.Error(), "")
+		return
+	}
+	originalLanguage := strings.ToLower(strings.TrimSpace(q.Get("original_language")))
 
 	if originalLanguage != "" {
 		matched, _ := regexp.MatchString("^[a-z]{2}$", originalLanguage)
@@ -245,9 +269,26 @@ func HandleTmdbDiscover(w http.ResponseWriter, r *http.Request) {
 		sortBy = "popularity.desc"
 	} else if sortParam == "vote" {
 		sortBy = "vote_count.desc"
+	} else if sortParam == "rating" {
+		sortBy = "vote_average.desc"
+	} else if sortParam == "title" {
+		sortBy = "popularity.desc"
 	}
 
-	cacheKey := fmt.Sprintf("discover:%s:%s:%s:pt-BR", tmdbMedia, sortBy, page)
+	cacheKey := fmt.Sprintf("discover:v2:%s:%s:%s:%s:%s:pt-BR", tmdbMedia, sortBy, page, year, rating)
+	if year != "" {
+		if tmdbMedia == "movie" {
+			dateFilter += "&primary_release_year=" + year
+		} else {
+			dateFilter += "&first_air_date_year=" + year
+		}
+	}
+	if rating != "" {
+		dateFilter += "&vote_average.gte=" + rating + "&vote_count.gte=10"
+	}
+	if sortParam == "rating" && rating == "" {
+		dateFilter += "&vote_count.gte=10"
+	}
 	if genreID != "" {
 		cacheKey += ":genre:" + genreID
 	}

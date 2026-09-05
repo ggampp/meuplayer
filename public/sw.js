@@ -1,8 +1,10 @@
 // MeuPlayer PWA Service Worker
 // Network-first for JS/CSS so hub/nav updates are never stuck behind shell cache.
-const CACHE_NAME = 'meuplayer-shell-v3-hub';
+const CACHE_NAME = 'meuplayer-shell-v4-modules';
 const SHELL_ASSETS = [
   '/',
+  '/vod',
+  '/tv',
   '/index.html',
   '/tokens.css',
   '/styles.css',
@@ -24,6 +26,8 @@ function isVolatileAsset(url) {
     const p = u.pathname;
     return (
       p.endsWith('.js') ||
+      !p.split('/').pop().includes('.') ||
+      p.endsWith('.html') ||
       p.endsWith('.css') ||
       p.startsWith('/css/') ||
       p === '/nav.js' ||

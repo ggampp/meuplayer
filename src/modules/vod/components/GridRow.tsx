@@ -39,7 +39,7 @@ export function GridRow({
             />
           ))
         ) : (
-          <div className="row__empty">{status || "Nenhum item encontrado."}</div>
+          <div className="row__empty">{status && /carreg|pesquisando|buscando|erro|falha|chave/i.test(status) ? status : "Nenhum título corresponde aos filtros desta página."}</div>
         )}
       </div>
       {hasMore ? (

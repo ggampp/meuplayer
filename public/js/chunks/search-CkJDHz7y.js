@@ -1,0 +1,2 @@
+import{r as n}from"./client-CA_NW5ym.js";var c=n();async function i(r,t){const a=await fetch(r,{signal:t}),e=await a.json().catch(()=>({}));if(!a.ok)throw new Error(e.detail||e.error||"Não foi possível carregar os dados. Tente novamente.");return e}function o(r){return r.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR").trim()}function f(r,t){const a=o(r);return o(t).split(/\s+/).every(e=>a.includes(e))}export{i as f,f as m,c as r};
+//# sourceMappingURL=search-CkJDHz7y.js.map

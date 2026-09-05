@@ -131,7 +131,7 @@ function createHub(): void {
       {
         className: "app-nav__logo",
         href: "/",
-        title: "MeuPlayer - catálogo",
+        title: "MeuPlayer — escolher módulo",
       },
       "MeuPlayer"
     )
@@ -251,7 +251,7 @@ function createHub(): void {
       })
     );
 
-    (externalProviders || []).forEach((provider) => {
+    (route.isExternalPlayerActive() ? externalProviders || [] : []).forEach((provider) => {
       platformsContainer.appendChild(buildExternalChip(provider));
       selectOptions.push({
         value: route.playerHref(provider),
@@ -260,7 +260,7 @@ function createHub(): void {
       });
     });
 
-    platformsContainer.appendChild(buildAddButton());
+    if (route.isExternalPlayerActive()) platformsContainer.appendChild(buildAddButton());
     fillSelect(platformSelect, selectOptions, (opt) => !!opt.selected);
   }
 

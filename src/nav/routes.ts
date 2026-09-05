@@ -21,7 +21,7 @@ export function createRouteContext(pathname = window.location.pathname, search =
   }
 
   function isMeuPlayerActive(): boolean {
-    if (currentPath === "/") return true;
+    if (currentPath === "/") return false;
     return CATALOG_PREFIXES.some(
       (p) => currentPath === p || currentPath.startsWith(p + "/")
     );
@@ -39,7 +39,7 @@ export function createRouteContext(pathname = window.location.pathname, search =
 
   function isLinkActive(linkPath: string): boolean {
     const normalized = normalizePath(linkPath);
-    if (normalized === "/") return currentPath === "/";
+    if (["/", "/vod", "/tv"].includes(normalized)) return currentPath === normalized;
     return currentPath === normalized || currentPath.startsWith(normalized + "/");
   }
 

@@ -15,7 +15,13 @@ func HandleStaticOrSPA(w http.ResponseWriter, r *http.Request) {
 	// Resolve rotas amigáveis da SPA
 	target := ""
 	if path == "/" || path == "" {
+		target = "home.html"
+	} else if path == "/vod" || path == "/vod/" {
 		target = "index.html"
+	} else if path == "/tv" || path == "/tv/" {
+		target = "rede-buzz.html"
+	} else if path == "/tv/favoritos" || path == "/tv/favoritos/" {
+		target = "rede-buzz-favoritos.html"
 	} else if path == "/canais" || path == "/canais/" {
 		target = "canais.html"
 	} else if path == "/rede-buzz" || path == "/rede-buzz/" {

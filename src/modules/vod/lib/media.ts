@@ -232,7 +232,7 @@ export function itemMatchesStatus(
     ? status === "released" || (!status && !!meta?.release_date)
     : ["ended", "canceled", "cancelled"].includes(status);
   if (statusValue === "finished") return finished;
-  if (statusValue === "ongoing") return !finished;
+  if (statusValue === "ongoing") return Boolean(status) && !finished;
   return true;
 }
 

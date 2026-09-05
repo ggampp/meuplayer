@@ -17,6 +17,8 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       input: {
+        home: resolve(__dirname, 'src/app/home.tsx'),
+        tv: resolve(__dirname, 'src/modules/tv/main.tsx'),
         nav: resolve(__dirname, 'src/nav.ts'),
         player: resolve(__dirname, 'src/player.ts'),
         'provider-modal': resolve(__dirname, 'src/provider-modal.ts'),

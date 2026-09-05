@@ -1,18 +1,21 @@
 {
   "name": "meuplayer",
   "version": "1.2.0",
-  "description": "MeuPlayer Desktop + Android TV",
+  "description": "MeuPlayer Web — VOD e TV ao vivo",
   "main": "main.js",
   "scripts": {
     "dev:web": "vite",
     "build:frontend": "vite build",
     "typecheck": "tsc --noEmit",
-    "start": "npm run build:frontend && electron .",
+    "start": "npm run build:frontend && go run ./cmd/server",
     "icons": "python scripts/generate-icons.py",
     "build:server": "powershell -ExecutionPolicy Bypass -File scripts/build-server.ps1",
     "build:win": "npm run build:frontend && npm run icons && npm run build:server && electron-builder --win",
     "build:linux": "npm run build:frontend && npm run icons && npm run build:server && electron-builder --linux",
-    "build:mac": "npm run build:frontend && npm run icons && npm run build:server && electron-builder --mac"
+    "build:mac": "npm run build:frontend && npm run icons && npm run build:server && electron-builder --mac",
+    "start:desktop": "npm run build:frontend && electron .",
+    "start:web": "npm start",
+    "test:search": "node scripts/test-search.mjs"
   },
   "build": {
     "appId": "com.meuplayer.app",
@@ -60,8 +63,18 @@
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.ico",
       "signAndEditExecutable": false

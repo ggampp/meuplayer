@@ -2,18 +2,8 @@ import { API_BASE, META_BATCH_CHUNK } from "./constants";
 import { tmdbAppType } from "./media";
 import type { MediaMeta, MediaType } from "../types/media";
 
-export async function fetchJson<T = Record<string, unknown>>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  const data = (await res.json().catch(() => ({}))) as T & {
-    detail?: string;
-    error?: string;
-  };
-  if (!res.ok) {
-    const detail = data.detail || data.error || "Falha na API";
-    throw new Error(detail);
-  }
-  return data;
-}
+import { fetchJson } from "../../../shared/lib/http";
+export { fetchJson };
 
 export async function fetchMetaBatch(
   type: MediaType | string,
